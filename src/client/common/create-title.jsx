@@ -21,6 +21,7 @@ export default function createTitle (res, hide = true) {
   if (!res) {
     return ''
   }
+  if (res.screenSession) return res.title || res.screenSession.slice(res.screenSession.indexOf('.') + 1)
   const {
     host, port, username, title, type, url,
     path, connectionHoppings, sshTunnels

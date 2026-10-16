@@ -20,7 +20,6 @@ import {
   mode2permission,
   permission2mode
 } from '../../common/mode2permission'
-import wait from '../../common/wait'
 import {
   fileOperationsMap,
   isWin, transferTypeMap, typeMap,
@@ -37,6 +36,7 @@ import { createTransferProps } from './transfer-common'
 import generate from '../../common/uid'
 import sanitizeFilename from '../../common/sanitize-filename'
 import { openTextEditor } from '../text-editor/open-text-editor'
+import { openExternalFiles } from '../../common/external-editor'
 import { refsStatic, refs, filesRef } from '../common/ref'
 import iconsMap from '../sys-menu/icons-map'
 import message from '../common/message'
@@ -453,7 +453,6 @@ export default class FileSection extends React.Component {
       .then(() => true)
       .catch(window.store.onError)
     if (res) {
-      await wait(500)
       await this.props.remoteList()
     }
   }
@@ -614,22 +613,14 @@ export default class FileSection extends React.Component {
 
   enterDirectory = (e, file = this.state.file) => {
     e && e.stopPropagation && e.stopPropagation()
-    const { type, name, isParent } = file
+    const { type, name } = file
     const n = `${type}Path`
-    const path = isParent ? file.path : this.props[n]
+    const path = file.path || this.props[n]
     let np = resolve(path, name)
     if (type === typeMap.remote) {
       np = normalizeRemotePath(np)
     }
-    const op = this.props[type + 'Path']
-    this.props.modifier({
-      [n]: np,
-      [n + 'Temp']: np
-    }, () => this.props[`${type}List`](
-      undefined,
-      undefined,
-      op
-    ))
+    this.props.navigateDirectory(type, np)
   }
 
   openFile = file => {
@@ -772,7 +763,12 @@ export default class FileSection extends React.Component {
     }
   }
 
+  // 用 Notepad++ 打开一个或多个文件，远程同步不绑定当前文件行。
   editFile = () => {
+    if (!window.et.isWebApp) {
+      const files = this.shouldShowSelectedMenu() ? this.props.getSelectedFiles() : [this.state.file]
+      return openExternalFiles(this.props.tab, files, this.props.sftp?.port).catch(window.store.onError)
+    }
     refs.add(this.id, this)
     // editor is lazy loaded, this will mount it on demand
     openTextEditor({
@@ -1030,7 +1026,6 @@ export default class FileSection extends React.Component {
       file: {
         type,
         isDirectory,
-        size,
         id,
         isEmpty,
         isParent
@@ -1055,9 +1050,16 @@ export default class FileSection extends React.Component {
       selectedFiles.has(id)
     const delTxt = shouldShowSelectedMenu ? `${e('del')}:${e('selected')}(${len})` : e('del')
     const canPaste = hasFileInClipboardText()
-    const showEdit = !isDirectory && id &&
-      size < maxEditFileSize
+    const editableFiles = shouldShowSelectedMenu ? this.props.getSelectedFiles().filter(file => !file.isDirectory && !file.isParent) : [this.props.file]
+    const showEdit = id && editableFiles.some(file => !file.isDirectory && (isLocal || file.size < maxEditFileSize))
     const res = []
+    if (showEdit) {
+      res.push({
+        func: 'editFile',
+        icon: 'EditOutlined',
+        text: editableFiles.length > 1 ? `用 Notepad++ 编辑所选文件 (${editableFiles.length})` : '用 Notepad++ 编辑'
+      })
+    }
     if (isDirectory && isRealFile) {
       res.push({
         func: 'doEnterDirectory',
@@ -1112,13 +1114,6 @@ export default class FileSection extends React.Component {
         func: 'downloadFromBrowser',
         icon: 'DownloadOutlined',
         text: e('downloadFromBrowser')
-      })
-    }
-    if (showEdit) {
-      res.push({
-        func: 'editFile',
-        icon: 'EditOutlined',
-        text: e('edit')
       })
     }
     if (isRealFile) {
@@ -1247,9 +1242,7 @@ export default class FileSection extends React.Component {
       isSymbolicLink,
       isParent
     } = file
-    if (isDirectory && id === 'size') {
-      value = null
-    } else if (!isDirectory && id === 'size') {
+    if (id === 'size') {
       value = filesize(Number(value) || 0)
     } else if (id === 'owner') {
       const { type } = this.props
@@ -1277,7 +1270,7 @@ export default class FileSection extends React.Component {
         width: size + '%',
         flexBasis: `${size}%`
       },
-      title: value
+      title: isDirectory && id === 'size' ? `${value}（目录项大小，不含目录内容）` : value
     }
     if (isParent && id !== 'name') {
       value = null
@@ -1321,6 +1314,8 @@ export default class FileSection extends React.Component {
       'data-id': id,
       id: this.id,
       'data-type': type,
+      role: 'option',
+      'aria-selected': selected,
       title: file.name
     }
     return (

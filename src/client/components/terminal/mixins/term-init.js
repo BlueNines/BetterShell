@@ -12,6 +12,7 @@ import { Osc52Addon } from '../osc52-addon.js'
 import { rendererTypes } from '../../../common/constants.js'
 import { refsStatic } from '../../common/ref.js'
 import keyControlPressed from '../../../common/key-control-pressed.js'
+import { setupTerminalHistory, terminalScrollback } from '../terminal-history.js'
 
 /**
  * Terminal bootstrap: create the xterm instance, load every addon and wire
@@ -25,7 +26,8 @@ export const initMixin = {
     const Terminal = await loadTerminal()
     const term = new Terminal({
       allowProposedApi: true,
-      scrollback: config.scrollback,
+      scrollback: terminalScrollback(config.scrollback),
+      scrollbar: { showScrollbar: true, width: 12 },
       rightClickSelectsWord: config.rightClickSelectsWord || false,
       mouseEventsRequireAlt: config.mouseEventsRequireAlt || false,
       fontFamily: tab.fontFamily || config.fontFamily,
@@ -37,10 +39,14 @@ export const initMixin = {
       fontSize: tab.fontSize || config.fontSize,
       screenReaderMode: config.screenReaderMode
     })
+    // 独立窗口只订阅显示数据，主终端和网络连接保持原实例。
+    const write = term.write.bind(term)
+    term.write = (data, callback) => write(data, () => { this.popout?.write(data); callback?.() })
 
     term.parent = this
     term.onSelectionChange(this.onSelection)
     term.open(this.domRef.current, true)
+    this.terminalHistory = setupTerminalHistory(term)
     this.registerTerminalColorQueryHandlers(term, themeConfig)
     await this.loadRenderer(term, config)
     this.fixSelectionColors(term)
@@ -69,12 +75,12 @@ export const initMixin = {
     const SearchAddon = await loadSearchAddon()
     this.searchAddon = new SearchAddon()
     const LigaturesAddon = await loadLigaturesAddon()
-    const ligtureAddon = new LigaturesAddon()
+    this.ligaturesAddon = new LigaturesAddon()
     this.searchAddon.onDidChangeResults(this.onSearchResultsChange)
     const Unicode11Addon = await loadUnicode11Addon()
     const unicode11Addon = new Unicode11Addon()
     term.loadAddon(unicode11Addon)
-    term.loadAddon(ligtureAddon)
+    term.loadAddon(this.ligaturesAddon)
     term.unicode.activeVersion = '11'
     term.loadAddon(this.fitAddon)
     term.loadAddon(this.searchAddon)

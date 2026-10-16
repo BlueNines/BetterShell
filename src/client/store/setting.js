@@ -6,7 +6,6 @@ import message from '../components/common/message'
 import copy from 'json-deep-copy'
 import {
   settingMap,
-  settingCommonId,
   settingSyncId,
   modals
 } from '../common/constants'
@@ -33,14 +32,10 @@ export default Store => {
     )
   }
 
+  // 打开个人版连接编辑器。
   Store.prototype.openBookmarkEdit = function (item) {
-    const { store } = window
-    store.storeAssign({
-      settingTab: settingMap.bookmarks
-    })
-    store.setSettingItem(item)
-    store.openSettingModal()
-    store.settingMobileView = 'content'
+    window.store.personalBookmarkId = item.id
+    window.store.personalDialog = 'connection'
   }
 
   Store.prototype.handleOpenQuickCommandsSetting = function () {
@@ -82,18 +77,9 @@ export default Store => {
     delete window.openTabBatch
   }
 
+  // 打开只包含常用项的设置。
   Store.prototype.openSetting = function () {
-    const { store } = window
-    if (
-      store.settingTab === settingMap.setting &&
-      store.settingItem.id === settingCommonId &&
-      store.showModal === modals.setting
-    ) {
-      return store.hideSettingModal()
-    }
-    store.settingTab = settingMap.setting
-    store.setSettingItem(getInitItem([], settingMap.setting))
-    store.openSettingModal()
+    window.store.personalDialog = 'preferences'
   }
 
   Store.prototype.openSettingSync = function () {

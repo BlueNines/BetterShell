@@ -79,9 +79,10 @@ export const REMOTE_MONITOR_COMMANDS = Object.freeze({
   memory: 'cat /proc/meminfo',
   network: NETWORK_COMMAND,
   uptime: 'cat /proc/uptime',
+  load: 'cat /proc/loadavg',
   users: 'who',
   disks: 'df -Pk',
-  activities: 'ps -eo pid=,user=,pcpu=,rss=,args= --sort=-pcpu'
+  activities: 'ps -eo pid=,user=,pcpu=,rss=,args= --sort=-pcpu | head -n 20'
 })
 
 export const REMOTE_MONITOR_INTERVALS = Object.freeze({
@@ -90,6 +91,7 @@ export const REMOTE_MONITOR_INTERVALS = Object.freeze({
   memory: 5000,
   network: 5000,
   uptime: 5000,
+  load: 5000,
   users: 30000,
   disks: 10000,
   activities: 5000
@@ -252,6 +254,14 @@ export function parseMemory (input) {
     percent: usedBytes * 100 / totalBytes,
     compatibilityMode: !hasAvailable
   }
+}
+
+// 解析 Linux 的一分钟、五分钟和十五分钟负载。
+export function parseLoad (input) {
+  const result = commandResult(input)
+  if (!result.ok) return null
+  const values = result.text.trim().split(/\s+/).slice(0, 3).map(numeric)
+  return values.length === 3 && values.every(value => value !== null && value >= 0) ? values : null
 }
 
 export function parseUptime (input, sampleTimestamp) {

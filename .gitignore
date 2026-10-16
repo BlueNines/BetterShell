@@ -106,6 +106,7 @@ dist
 
 # custom
 /temp/
+/vendor/notepad-plus-plus/
 /dist/
 /work/
 /version
@@ -133,3 +134,17 @@ ftp-root
 .cursor
 .lintcache
 .npmcache
+
+# Local shortcuts and private connection data
+/*.lnk
+*_connect_config.json
+/.env.*
+!/.env.example
+/user-data/
+/*.db
+/*.sqlite
+/*.sqlite3
+/*.pem
+/*.key
+/id_rsa
+/id_ed25519

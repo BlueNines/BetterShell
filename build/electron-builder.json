@@ -1,14 +1,17 @@
 {
-  "appId": "org.electerm.electerm",
+  "appId": "org.bettershell.personal",
   "directories": {
     "app": "work/app",
-    "output": "dist",
+    "output": "dist/personal",
     "buildResources": "node_modules/@electerm/electerm-resource/build-res"
   },
   "electronLanguages": [
     "en-US"
   ],
   "asar": true,
+  "extraResources": [
+    { "from": "vendor/notepad-plus-plus", "to": "notepad-plus-plus", "filter": ["**/*", "!plugins/**", "!updater/**"] }
+  ],
   "asarUnpack": [
     "node_modules/node-pty/build/Release/**"
   ],
@@ -19,11 +22,7 @@
       "appx",
       "nsis"
     ],
-    "icon": "node_modules/@electerm/electerm-resource/build/icons-win.ico",
-    "publish": {
-      "provider": "github",
-      "channel": "${env.WORKFLOW_NAME}"
-    }
+    "icon": "node_modules/@electerm/electerm-resource/build/icons-win.ico"
   },
   "protocols": [
     {
@@ -31,51 +30,6 @@
       "schemes": [
         "ssh"
       ]
-    },
-    {
-      "name": "Telnet Protocol",
-      "schemes": [
-        "telnet"
-      ]
-    },
-    {
-      "name": "RDP Protocol",
-      "schemes": [
-        "rdp"
-      ]
-    },
-    {
-      "name": "VNC Protocol",
-      "schemes": [
-        "vnc"
-      ]
-    },
-    {
-      "name": "Serial Protocol",
-      "schemes": [
-        "serial"
-      ]
-    },
-    {
-      "name": "Spice Protocol",
-      "schemes": [
-        "spice"
-      ]
-    },
-    {
-      "name": "Electerm Protocol",
-      "schemes": [
-        "electerm"
-      ]
-    }
-  ],
-  "fileAssociations": [
-    {
-      "ext": "vv",
-      "name": "Virt Viewer connection file",
-      "description": "SPICE console connection file (virt-viewer / remote-viewer)",
-      "mimeType": "application/x-virt-viewer",
-      "role": "Viewer"
     }
   ],
   "appx": {
@@ -146,5 +100,12 @@
   },
   "deb": {
     "afterInstall": "build/bin/linux-deb-after-build.sh"
-  }
+  },
+  "files": [
+    "**/*",
+    "!widgets/**",
+    "!lib/ai*.js",
+    "!server/session-{serial,telnet,ftp,rdp,vnc,spice}.js",
+    "!server/{ftp-client,ftp-transfer,rdp-proxy,spice-proxy,vnc-proxy,sync,webdav-sync}.js"
+  ]
 }

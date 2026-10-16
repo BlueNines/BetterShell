@@ -2,25 +2,22 @@ import { Component } from 'react'
 import { refs } from '../common/ref'
 import generate from '../../common/uid'
 import runIdle from '../../common/run-idle'
-import { Spin } from 'antd'
+import { Spin, Button, Space } from 'antd'
 import { notification } from '../common/notification'
 import Modal from '../common/modal'
 import clone from '../../common/to-simple-obj'
-import { isEqual, last, isNumber, some, isArray, pick, uniq, debounce } from 'lodash-es'
+import { last, isNumber, some, isArray, pick, uniq, debounce } from 'lodash-es'
 import FileSection from './file-item'
 import resolve from '../../common/resolve'
-import wait from '../../common/wait'
 import classnames from 'classnames'
 import sorterIndex from '../../common/index-sorter'
 import { handleErr } from '../../common/fetch'
-import { getLocalFileInfo, getRemoteFileInfo, getFolderFromFilePath } from './file-read'
+import { getLocalFileInfo, getLocalDirectoryInfo, getRemoteFileInfo, getFolderFromFilePath } from './file-read'
 import {
   typeMap, maxSftpHistory, paneMap,
   fileTypeMap,
   terminalSerialType,
-  terminalFtpType,
-  unexpectedPacketErrorDesc,
-  sftpRetryInterval
+  terminalFtpType
 } from '../../common/constants'
 import { hasFileInClipboardText } from '../../common/clipboard'
 import Client from '../../common/sftp'
@@ -33,7 +30,11 @@ import * as owner from './owner-list'
 import AddressBar from './address-bar'
 import getProxy from '../../common/get-proxy'
 import { createTerm } from '../terminal/terminal-apis'
+import FileBrowser from '../personal/file-browser'
+import { getWorkspaceState, registerWorkspaceState } from '../../common/workspace-state'
 import './sftp.styl'
+import { sortFileList } from '../../common/file-list-navigation'
+import DirectoryCache from '../../common/directory-cache'
 
 const e = window.translate
 
@@ -47,9 +48,18 @@ export default class Sftp extends Component {
       lastClickedFile: null,
       onEditFile: false,
       ...this.defaultState(),
+      ...getWorkspaceState(props.tab.id, 'files'),
       loadingSftp: false,
       inited: false,
       ready: false
+    }
+    // 旧工作区的默认时间排序迁移为名称排序，之后仍保存用户手动选择的列。
+    const saved = getWorkspaceState(props.tab.id, 'files')
+    if (saved.sortVersion !== 1) {
+      for (const type of ['local', 'remote']) {
+        this.state[`sortProp.${type}`] = 'name'
+        this.state[`sortDirection.${type}`] = 'asc'
+      }
     }
     this.retryCount = 0
   }
@@ -57,6 +67,14 @@ export default class Sftp extends Component {
   componentDidMount () {
     this.id = 'sftp-' + this.props.tab.id
     refs.add(this.id, this)
+    // 只保存路径、排序和筛选，不持久化文件缓存或 SFTP 对象。
+    this.unregisterWorkspace = registerWorkspaceState(this.props.tab.id, 'files', () => {
+      const state = { sortVersion: 1 }
+      for (const type of ['local', 'remote']) {
+        for (const key of [type + 'Path', type + 'PathTemp', type + 'ShowHiddenFile', type + 'Keyword', 'sortProp.' + type, 'sortDirection.' + type]) state[key] = this.state[key]
+      }
+      return state
+    })
     if (this.props.isFtp) {
       this.initFtpData()
     }
@@ -68,6 +86,7 @@ export default class Sftp extends Component {
   }
 
   componentDidUpdate (prevProps, prevState) {
+    if (['localPath', 'remotePath', 'localShowHiddenFile', 'remoteShowHiddenFile', 'localKeyword', 'remoteKeyword', 'sortProp.local', 'sortProp.remote', 'sortDirection.local', 'sortDirection.remote'].some(key => prevState[key] !== this.state[key])) window.store.scheduleWorkspaceSave()
     if (
       this.props.config.autoRefreshWhenSwitchToSftp &&
       prevProps.pane !== this.props.pane &&
@@ -101,6 +120,12 @@ export default class Sftp extends Component {
   }
 
   componentWillUnmount () {
+    this.directoryDisposed = true
+    for (const type of ['local', 'remote']) {
+      this.cancelDirectoryPrefetch(type)
+      this.directoryCaches.get(type)?.dispose()
+    }
+    this.unregisterWorkspace?.()
     refs.remove(this.id)
     this.sftp && this.sftp.destroy()
     this.sftp = null
@@ -110,9 +135,9 @@ export default class Sftp extends Component {
     this.timer4 = null
     clearTimeout(this.retryHandler)
     this.retryHandler = null
-    // Clear sort cache to prevent memory leaks
-    this._sortCache?.clear()
-    this._lastSortArgs = null
+    this._visibleFileLists.clear()
+    this.remoteListDebounce.cancel()
+    this.localListDebounce.cancel()
   }
 
   initFtpData = async () => {
@@ -179,86 +204,11 @@ export default class Sftp extends Component {
     }, {})
   }
 
-  // Cache for memoized sort results
-  _sortCache = new Map()
-  _lastSortArgs = null
+  // 只保留本地和远程当前列表的结果，选择文件时不重复排序。
+  _visibleFileLists = new Map()
 
-  sort = (list, type, sortDirection, sortProp) => {
-    // Create a cache key from the arguments
-    const cacheKey = JSON.stringify({
-      listLength: list?.length || 0,
-      listHash: this._hashList(list),
-      type,
-      sortDirection,
-      sortProp
-    })
-
-    // Check if we have a cached result and if args haven't changed
-    if (this._lastSortArgs && isEqual(this._lastSortArgs, [list, type, sortDirection, sortProp])) {
-      const cached = this._sortCache.get(cacheKey)
-      if (cached) {
-        return cached
-      }
-    }
-
-    // Compute the result
-    if (!list || !list.length) {
-      return []
-    }
-
-    const isDesc = sortDirection === 'desc'
-
-    const result = list.slice().sort((a, b) => {
-      // Handle items with no id first
-      if (!a.id && b.id) return -1
-      if (a.id && !b.id) return 1
-      if (!a.id && !b.id) return 0
-
-      // Sort directories before files
-      if (a.isDirectory !== b.isDirectory) {
-        return a.isDirectory ? -1 : 1
-      }
-
-      // Sort by the specified property
-      let aValue = a[sortProp]
-      let bValue = b[sortProp]
-
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        aValue = aValue.toLowerCase()
-        bValue = bValue.toLowerCase()
-        return isDesc
-          ? bValue.localeCompare(aValue, { sensitivity: 'base' })
-          : aValue.localeCompare(bValue, { sensitivity: 'base' })
-      }
-
-      // For non-string values, use simple comparison
-      if (aValue < bValue) return isDesc ? 1 : -1
-      if (aValue > bValue) return isDesc ? -1 : 1
-      return 0
-    })
-
-    // Cache the result
-    this._lastSortArgs = [list, type, sortDirection, sortProp]
-    this._sortCache.set(cacheKey, result)
-
-    // Limit cache size to prevent memory leaks
-    if (this._sortCache.size > 10) {
-      const firstKey = this._sortCache.keys().next().value
-      this._sortCache.delete(firstKey)
-    }
-
-    return result
-  }
-
-  // Helper method to create a simple hash of the list for cache key
-  _hashList = (list) => {
-    if (!list || !list.length) return 0
-    return list.reduce((hash, item, index) => {
-      const str = `${item.id || ''}${item.name || ''}${item.modifyTime || ''}${index}`
-      return hash + str.length
-    }, 0)
-  }
-
+  // 所有类型统一按当前列排序，不再先分文件夹和文件。
+  sort = (list, type, direction, property) => sortFileList(list || [], property, direction)
   isActive () {
     const { currentBatchTabId, pane, sshSftpSplitView } = this.props
     const { tab } = this.props
@@ -284,8 +234,6 @@ export default class Sftp extends Component {
   }
 
   gotoHome = async (type) => {
-    const n = `${type}Path`
-    const nt = n + 'Temp'
     let path
 
     if (type === typeMap.remote) {
@@ -316,10 +264,7 @@ export default class Sftp extends Component {
       return
     }
 
-    this.setState({
-      [n]: path,
-      [nt]: path
-    }, () => this[`${type}List`]())
+    this.navigateDirectory(type, path)
   }
 
   updateCwd = (cwd = this.props.cwd) => {
@@ -336,12 +281,7 @@ export default class Sftp extends Component {
     //     type
     //   )
     // })
-    const n = `${type}Path`
-    const nt = n + 'Temp'
-    this.setState({
-      [n]: cwd,
-      [nt]: cwd
-    }, () => this[`${type}List`]())
+    if (cwd && cwd !== this.state[type + 'Path']) this.navigateDirectory(type, cwd)
   }
 
   getPwd = async (username) => {
@@ -475,9 +415,6 @@ export default class Sftp extends Component {
     const type = files[0]?.type || _type
     const func = this[type + 'Del']
     await Promise.all(files.map(f => func(f)))
-    if (type === typeMap.remote) {
-      await wait(500)
-    }
     this[type + 'List']()
   }
 
@@ -562,8 +499,7 @@ export default class Sftp extends Component {
     this.port = port
     if (this.shouldRenderRemote()) {
       this.initRemoteAll()
-    }
-    this.initLocalAll()
+    } else this.initLocalAll()
   }
 
   shouldRenderRemote = () => {
@@ -622,6 +558,11 @@ export default class Sftp extends Component {
     const keyword = this.state[`${type}Keyword`]
     let list = this.state[type]
     list = isArray(list) ? list : []
+    const direction = this.state[`sortDirection.${type}`]
+    const property = this.state[`sortProp.${type}`]
+    const cached = this._visibleFileLists.get(type)
+    if (cached && cached.source === list && cached.hidden === showHide && cached.keyword === keyword && cached.direction === direction && cached.property === property) return cached.result
+    const source = list
 
     // Combine filtering for showHide and keyword in one loop
     if (!showHide || keyword) {
@@ -637,12 +578,9 @@ export default class Sftp extends Component {
       })
     }
 
-    return this.sort(
-      list,
-      type,
-      this.state[`sortDirection.${type}`],
-      this.state[`sortProp.${type}`]
-    )
+    const result = this.sort(list, type, direction, property)
+    this._visibleFileLists.set(type, { source, hidden: showHide, keyword, direction, property, result })
+    return result
   }
 
   toggleShowHiddenFile = type => {
@@ -653,8 +591,8 @@ export default class Sftp extends Component {
     })
   }
 
-  buildTree = (arr, type) => {
-    const parent = this.renderParentItem(type)
+  buildTree = (arr, type, folder = this.state[type + 'Path']) => {
+    const parent = this.renderParentItem(type, folder)
     const treeMap = new Map(arr.map(d => [d.id, d]))
 
     // Only add parent if it exists
@@ -707,241 +645,176 @@ export default class Sftp extends Component {
       })
   }
 
-  remoteList = async (
-    returnList = false,
-    remotePathReal,
-    oldPath
-  ) => {
-    const { tab, sessionOptions } = this.props
-    const { username, startDirectory } = tab
-    let remotePath
-    const noPathInit = remotePathReal || this.state.remotePath
-    if (noPathInit) {
-      remotePath = noPathInit
+  directoryCaches = new Map()
+  directoryRequests = { local: 0, remote: 0 }
+  directoryPrefetch = {}
+  directoryPrefetchRunning = {}
+  directoryDisposed = false
+  sftpGeneration = 0
+
+  // 文件列表、目录树和预读共用当前标签的同一份缓存与请求。
+  getDirectoryCache = type => {
+    if (!this.directoryCaches.has(type)) this.directoryCaches.set(type, new DirectoryCache(folder => type === typeMap.remote ? this.readRemoteDirectory(folder) : getLocalDirectoryInfo(folder)))
+    return this.directoryCaches.get(type)
+  }
+
+  // 并发读取目录时只建立一个 SFTP 通道，重连和卸载会丢弃旧连接。
+  ensureSftp = () => {
+    if (this.sftp) return Promise.resolve(this.sftp)
+    if (this.sftpConnecting) return this.sftpConnecting
+    const generation = this.sftpGeneration
+    const { tab, sessionOptions, config } = this.props
+    this.setState({ loadingSftp: true })
+    const request = (async () => {
+      const client = await Client(this.terminalId, this.type, this.port)
+      try {
+        const connected = await client.connect(deepCopy({ ...tab, readyTimeout: config.sshReadyTimeout, terminalId: this.terminalId, keepaliveInterval: config.keepaliveInterval, proxy: getProxy(tab, config), ...sessionOptions }))
+        if (!connected || this.directoryDisposed || generation !== this.sftpGeneration) throw new Error('文件连接已关闭')
+        this.sftp = client
+        this.props.editTab(tab.id, { sftpCreated: true })
+        return client
+      } catch (error) { client.destroy(); throw error }
+    })().finally(() => {
+      if (this.sftpConnecting !== request) return
+      this.sftpConnecting = null
+      if (!this.directoryDisposed) this.setState({ loadingSftp: false })
+    })
+    this.sftpConnecting = request
+    return request
+  }
+
+  // 一层目录只列举一次，符号链接属性有限并发补齐且不改写其他目录界面。
+  readRemoteDirectory = async folder => {
+    const sftp = await this.ensureSftp()
+    const list = await this.sftpList(sftp, folder)
+    const links = list.filter(file => file.isSymbol)
+    let next = 0
+    // 只对链接追加 stat，普通目录项沿用 SFTP 已返回的属性。
+    async function followLinks () {
+      while (next < links.length) {
+        const file = links[next++]
+        const info = await getRemoteFileInfo(sftp, resolve(folder, file.name)).catch(() => null)
+        file.isSymbolicLink = true
+        file.isDirectory = info?.isDirectory || false
+      }
     }
-    if (!returnList) {
-      this.setState({
-        remoteLoading: true
-      })
-    }
-    const oldRemote = deepCopy(
-      this.state.remote
-    )
-    let sftp = this.sftp
+    await Promise.all(Array.from({ length: Math.min(8, links.length) }, followLinks))
+    return list
+  }
+
+  // 导航同步显示近期快照，过期内容后台更新；迟到响应不能覆盖新路径。
+  navigateDirectory = async (type, folder, { refresh = false, oldPath = this.state[type + 'Path'], preserveInput = false } = {}) => {
+    if (!folder || this.directoryDisposed) return
+    if (type === typeMap.remote) folder = normalizeRemotePath(folder)
+    else if (/^[a-z]:[\\/]?$/i.test(folder)) folder = folder.slice(0, 2) + '\\'
+    this.cancelDirectoryPrefetch(type)
+    const request = ++this.directoryRequests[type]
+    const cache = this.getDirectoryCache(type)
+    const previous = this.state[type]
+    if (refresh) cache.invalidate(folder)
+    const snapshot = cache.peek(folder)?.list
+    const visible = snapshot || (folder === oldPath ? previous : [])
+    this.setState({
+      [type + 'Path']: folder,
+      [type + 'PathTemp']: preserveInput && this.state[type + 'PathTemp'] && this.state[type + 'PathTemp'] !== oldPath ? this.state[type + 'PathTemp'] : folder,
+      [type]: visible,
+      [type + 'FileTree']: this.buildTree(visible, type, folder),
+      [type + 'Loading']: !snapshot,
+      [type + 'Keyword']: folder === oldPath ? this.state[type + 'Keyword'] : '',
+      selectedFiles: new Set(),
+      lastClickedFile: null,
+      onEditFile: false
+    })
     try {
-      if (!this.sftp) {
-        sftp = await Client(this.terminalId, this.type, this.port)
-        if (!sftp) {
-          return
-        }
-        const config = deepCopy(
-          this.props.config
-        )
-        this.setState({
-          loadingSftp: true
-        })
-        const opts = deepCopy({
-          ...tab,
-          readyTimeout: config.sshReadyTimeout,
-          terminalId: this.terminalId,
-          keepaliveInterval: config.keepaliveInterval,
-          proxy: getProxy(tab, config),
-          ...sessionOptions
-        })
-        const r = await sftp.connect(opts)
-          .catch(e => {
-            if (
-              e &&
-              e.message.includes(unexpectedPacketErrorDesc) && this.retryCount
-            ) {
-              this.retryHandler = setTimeout(
-                () => this.initData(
-                  true
-                ),
-                sftpRetryInterval
-              )
-              this.retryCount++
-            } else {
-              throw e
-            }
-          })
-        this.setState(() => {
-          return {
-            loadingSftp: false
-          }
-        })
-        if (!r) {
-          sftp.destroy()
-          return this.props.editTab(tab.id, {
-            sftpCreated: false
-          })
-        } else {
-          this.sftp = sftp
-        }
-      }
-
-      if (!remotePath) {
-        if (startDirectory) {
-          remotePath = normalizeRemotePath(startDirectory)
-        } else {
-          remotePath = await this.getPwd(username)
-        }
-      }
-
-      const remote = await this.sftpList(sftp, remotePath)
-      this.sftp = sftp
-      const update = {
-        remote,
-        remoteFileTree: this.buildTree(remote, typeMap.remote),
-        inited: true,
-        remoteLoading: false
-      }
-      if (!noPathInit) {
-        update.remotePath = remotePath
-        update.remotePathTemp = remotePath
-      }
-      if (returnList) {
-        return remote
-      } else {
-        update.onEditFile = false
-      }
-      if (oldPath) {
-        update.remotePathHistory = uniq([
-          oldPath,
-          ...this.state.remotePathHistory
-        ]).slice(0, maxSftpHistory)
-      }
-      this.setState(update, () => {
-        if (this.type !== 'ftp') {
-          this.updateRemoteList(remote, remotePath, sftp)
-        }
-        this.props.editTab(tab.id, {
-          sftpCreated: true
-        })
-      })
-    } catch (e) {
-      const update = {
-        remoteLoading: false,
-        remote: oldRemote,
-        loadingSftp: false
-      }
-      if (oldPath) {
-        update.remotePath = oldPath
-        update.remotePathTemp = oldPath
-      }
-      this.setState(update)
-      this.onError(e)
+      const list = await cache.read(folder)
+      if (this.directoryDisposed || request !== this.directoryRequests[type]) return list
+      const history = oldPath && oldPath !== folder ? uniq([oldPath, ...this.state[type + 'PathHistory']]).slice(0, maxSftpHistory) : this.state[type + 'PathHistory']
+      this.setState({ [type]: list, [type + 'FileTree']: this.buildTree(list, type, folder), [type + 'Loading']: false, [type + 'PathHistory']: history, inited: true }, () => this.warmAdjacentDirectories(type, folder, list))
+      return list
+    } catch (error) {
+      if (this.directoryDisposed || request !== this.directoryRequests[type]) return
+      cache.invalidate(folder)
+      const rollback = oldPath || folder
+      const list = cache.peek(rollback)?.list || previous
+      this.setState({ [type + 'Path']: rollback, [type + 'PathTemp']: rollback, [type]: list, [type + 'FileTree']: this.buildTree(list, type, rollback), [type + 'Loading']: false })
+      this.onError(error)
     }
   }
 
-  updateRemoteList = async (
-    remotes,
-    remotePath,
-    sftp
-  ) => {
-    // Resolve all symlinks in parallel for faster updates.
-    // Use sftp.stat (which follows symlinks) directly on the link path
-    // instead of readlink + realpath + stat, reducing 2-3 SFTP round
-    // trips per symlink to just 1.
-    const results = await Promise.all(
-      remotes.map(async r => {
-        if (!r.isSymbol) {
-          r.isSymbolicLink = false
-          return r
-        }
-        const linkPath = resolve(remotePath, r.name)
-        const realFileInfo = await getRemoteFileInfo(
-          sftp,
-          linkPath
-        ).catch(e => {
-          console.debug('seems a bad symbolic link')
-          console.debug(e)
-          return null
-        })
-        if (!realFileInfo) {
-          return null
-        }
-        r.isSymbolicLink = true
-        r.isDirectory = realFileInfo.isDirectory
-        return r
-      })
-    )
-    const remote = results.filter(Boolean)
-    const update = {
-      remote,
-      remoteFileTree: this.buildTree(remote, typeMap.remote)
+  // 后台预读只读父目录和最多两个直接子目录，大目录跳过自动预读。
+  warmAdjacentDirectories = (type, folder, list) => {
+    if (list.length > 2000) return
+    let parent = resolve(folder, '..')
+    if (type === typeMap.local && /^[a-z]:$/i.test(parent)) parent += '\\'
+    const paths = parent !== folder && !(type === typeMap.local && parent === '/') ? [parent] : []
+    let children = 0
+    for (const file of this.getFileList(type)) {
+      if (file.isDirectory && !file.isSymbolicLink && file.name !== '.' && file.name !== '..') { paths.push(resolve(folder, file.name)); children++ }
+      if (children >= 2) break
     }
-    this.setState(update)
+    this.scheduleDirectoryPrefetch(type, paths)
   }
 
-  getLocalHome = () => {
-    return this.props.tab.startDirectoryLocal ||
-    this.props.config.startDirectoryLocal ||
-    window.pre.homeOrTmp
+  // 用户停留的目录优先预读，仍只读一层并复用已经进行中的请求。
+  prefetchDirectory = (type, folder) => this.scheduleDirectoryPrefetch(type, [folder], 200)
+
+  // 每次导航取消尚未开始的预读，正在读取的一层结束后不再继续旧队列。
+  cancelDirectoryPrefetch = type => {
+    const pending = this.directoryPrefetch[type]
+    if (pending) { clearTimeout(pending.timer); pending.cancelled = true }
+    delete this.directoryPrefetch[type]
   }
 
-  localList = async (returnList = false, localPathReal, oldPath) => {
+  // 空闲后串行预读少量候选；切换标签、导航或关闭面板即停止后续请求。
+  scheduleDirectoryPrefetch = (type, paths, delay = 350) => {
+    this.cancelDirectoryPrefetch(type)
+    if (this.directoryDisposed || !this.isActive()) return
+    const cache = this.getDirectoryCache(type)
+    const pending = { cancelled: false }
+    pending.timer = setTimeout(async () => {
+      await this.directoryPrefetchRunning[type]
+      if (pending.cancelled || this.directoryDisposed || !this.isActive()) return
+      const work = (async () => {
+        for (const folder of [...new Set(paths)].slice(0, 3)) {
+          if (pending.cancelled || this.directoryDisposed || !this.isActive()) break
+          try { await cache.read(folder) } catch { /* 预读无权限的目录不打断用户当前操作。 */ }
+        }
+      })()
+      this.directoryPrefetchRunning[type] = work
+      await work
+      if (this.directoryPrefetchRunning[type] === work) delete this.directoryPrefetchRunning[type]
+      if (this.directoryPrefetch[type] === pending) delete this.directoryPrefetch[type]
+    }, delay)
+    this.directoryPrefetch[type] = pending
+  }
+
+  // 默认调用用于刷新；目录树只读取缓存，不改变路径、选择或加载状态。
+  remoteList = async (returnList = false, folder, oldPath) => {
+    const navigation = this.directoryRequests.remote
+    try {
+      await this.ensureSftp()
+      folder = normalizeRemotePath(folder || this.state.remotePath || this.props.tab.startDirectory || await this.getPwd(this.props.tab.username))
+      if (returnList) return this.getDirectoryCache(typeMap.remote).read(folder)
+      // 初始主目录迟到时不能盖掉已经进入的目录，刷新也保留正在编辑的地址。
+      if (this.directoryDisposed || navigation !== this.directoryRequests.remote) return
+      return this.navigateDirectory(typeMap.remote, folder, { refresh: !oldPath, oldPath: oldPath || this.state.remotePath, preserveInput: true })
+    } catch (error) { if (returnList) throw error; if (!this.directoryDisposed) this.onError(error) }
+  }
+
+  // 保持本机默认目录规则；普通目录通过一次批量属性请求完成读取。
+  getLocalHome = () => this.props.tab.startDirectoryLocal || this.props.config.startDirectoryLocal || window.pre.homeOrTmp
+
+  // 本地刷新与远程使用同样的缓存失效和请求顺序规则。
+  localList = (returnList = false, folder, oldPath) => {
     if (!window.fs) return
-    if (!returnList) {
-      this.setState({
-        localLoading: true
-      })
-    }
-    const oldLocal = deepCopy(
-      this.state.local
-    )
-    try {
-      const noPathInit = localPathReal || this.state.localPath
-      const localPath = noPathInit ||
-        this.getCwdLocal() ||
-        this.getLocalHome()
-      const locals = await window.fs.readdirAsync(localPath)
-      const results = await Promise.all(
-        locals.map(name => {
-          const p = resolve(localPath, name)
-          return getLocalFileInfo(p).catch(console.log)
-        })
-      )
-      const local = results.filter(Boolean)
-      const update = {
-        local,
-        inited: true,
-        localFileTree: this.buildTree(local, typeMap.local),
-        localLoading: false
-      }
-      if (!noPathInit) {
-        update.localPath = localPath
-        update.localPathTemp = localPath
-      }
-      if (returnList) {
-        return local
-      } else {
-        update.onEditFile = false
-      }
-      if (oldPath) {
-        update.localPathHistory = uniq([
-          oldPath,
-          ...this.state.localPathHistory
-        ]).slice(0, maxSftpHistory)
-      }
-      this.setState(update)
-    } catch (e) {
-      const update = {
-        localLoading: false,
-        local: oldLocal
-      }
-      if (oldPath) {
-        update.localPath = oldPath
-        update.localPathTemp = oldPath
-      }
-      this.setState(update)
-      this.onError(e)
-    }
+    folder = folder || this.state.localPath || this.getCwdLocal() || this.getLocalHome()
+    if (returnList) return this.getDirectoryCache(typeMap.local).read(folder)
+    return this.navigateDirectory(typeMap.local, folder, { refresh: !oldPath, oldPath: oldPath || this.state.localPath, preserveInput: true })
   }
 
-  remoteListDebounce = debounce(this.remoteList, 1000)
+  remoteListDebounce = debounce(this.remoteList, 200)
 
-  localListDebounce = debounce(this.localList, 1000)
+  localListDebounce = debounce(this.localList, 200)
 
   timers = {}
 
@@ -952,15 +825,15 @@ export default class Sftp extends Component {
   }
 
   onClickHistory = (type, path) => {
-    const n = `${type}Path`
-    const oldPath = this.state[type + 'Path']
-    this.setState({
-      [n]: path,
-      [`${n}Temp`]: path
-    }, () => this[`${type}List`](undefined, undefined, oldPath))
+    this.navigateDirectory(type, path)
   }
 
   handleReloadRemoteSftp = async () => {
+    this.sftpGeneration++
+    this.sftpConnecting = null
+    this.directoryRequests.remote++
+    this.cancelDirectoryPrefetch(typeMap.remote)
+    this.directoryCaches.get(typeMap.remote)?.clear()
     if (this.sftp) {
       this.sftp.destroy()
       this.sftp = null
@@ -1021,13 +894,10 @@ export default class Sftp extends Component {
 
   onGoto = async (type, e) => {
     e && e.preventDefault()
-    if (type === typeMap.remote && !this.sftp) {
-      return this.initData(true)
-    }
     const n = `${type}Path`
     const nt = n + 'Temp'
     const oldPath = this.state[type + 'Path']
-    let np = await this.parsePath(type, this.state[nt])
+    let np = await this.parsePath(type, e?.target?.value ?? this.state[nt])
     if (type === typeMap.remote) {
       np = normalizeRemotePath(np)
     } else if (np.length > 1 && np.endsWith('/')) {
@@ -1041,16 +911,11 @@ export default class Sftp extends Component {
         message: 'path not valid'
       })
     }
-    this.setState({
-      [n]: np,
-      [nt]: np,
-      [`${type}Keyword`]: ''
-    }, () => this[`${type}List`](undefined, undefined, oldPath))
+    this.navigateDirectory(type, np, { refresh: np === oldPath })
   }
 
   goParent = (type) => {
-    const n = `${type}Path`
-    const p = this.state[n]
+    const p = this.state[type + 'Path']
     if (typeof p !== 'string' || !p) {
       return
     }
@@ -1058,17 +923,7 @@ export default class Sftp extends Component {
     if (type === typeMap.remote) {
       np = normalizeRemotePath(np)
     }
-    const op = this.state[n]
-    if (np !== p) {
-      this.setState({
-        [n]: np,
-        [n + 'Temp']: np
-      }, () => this[`${type}List`](
-        undefined,
-        undefined,
-        op
-      ))
-    }
+    if (np !== p) this.navigateDirectory(type, np)
   }
 
   getFileProps = (file, type) => {
@@ -1091,7 +946,8 @@ export default class Sftp extends Component {
         'addTransferList',
         'renderDelConfirmTitle',
         'getSelectedFiles',
-        'getFileItemById'
+        'getFileItemById',
+        'navigateDirectory'
       ]),
       ...pick(this.state, [
         'id',
@@ -1148,15 +1004,13 @@ export default class Sftp extends Component {
     )
   }
 
-  getPathUid = (type, type1) => {
-    const currentPath = this.state[`${type}Path`]
+  getPathUid = (type, type1, currentPath = this.state[type + 'Path']) => {
     const parentPath = resolve(currentPath, '..')
     const { id } = this.props.tab
     return `${type1}-${parentPath}-${id}-${type}`
   }
 
-  renderParentItem = (type) => {
-    const currentPath = this.state[`${type}Path`]
+  renderParentItem = (type, currentPath = this.state[type + 'Path']) => {
     // The path can be momentarily unknown (e.g. the remote home while the sftp
     // client is still connecting). Show no parent item rather than throwing.
     if (typeof currentPath !== 'string') {
@@ -1168,7 +1022,7 @@ export default class Sftp extends Component {
       return null
     }
 
-    const uniqueId = this.getPathUid(type, 'parent')
+    const uniqueId = this.getPathUid(type, 'parent', currentPath)
 
     return {
       type,
@@ -1238,6 +1092,23 @@ export default class Sftp extends Component {
     )
   }
 
+  // 从系统文件选择器上传文件到当前远程目录。
+  uploadFiles = async () => {
+    const result = await window.api.openDialog({ properties: ['openFile', 'multiSelections'] })
+    if (!result?.length || !this.remoteDom) return
+    const files = await Promise.all(result.map(getLocalFileInfo))
+    await this.remoteDom.doTransferSelected(null, files, this.state.remotePath, typeMap.remote)
+  }
+
+  // 将选中的远程文件下载到用户明确选择的本地目录。
+  downloadFiles = async () => {
+    const files = this.getSelectedFiles()
+    if (!files.length || !this.remoteDom) return
+    const result = await window.api.openDialog({ properties: ['openDirectory'] })
+    const folder = result?.[0]
+    if (folder) await this.remoteDom.doTransferSelected(null, files, folder, typeMap.local)
+  }
+
   renderSection (type, style, width) {
     const {
       id
@@ -1259,13 +1130,16 @@ export default class Sftp extends Component {
           'getFileProps',
           'defaultDirection',
           'modifier',
-          'sort'
+          'sort',
+          'prefetchDirectory'
         ]
       ),
       sortProp: this.state[`sortProp.${type}`],
       sortDirection: this.state[`sortDirection.${type}`],
       width,
-      fileList: arr
+      fileList: arr,
+      selectedFiles: this.state.selectedFiles,
+      lastClickedFile: this.state.lastClickedFile
     }
     const addrProps = {
       host,
@@ -1308,6 +1182,7 @@ export default class Sftp extends Component {
       >
         <Spin spinning={loading}>
           <div className='pd1 sftp-panel'>
+            <div className='personal-file-toolbar'><span>{type === typeMap.remote ? '远程文件' : '本机文件'}</span>{type === typeMap.remote && <Space size={4}><Button size='small' onClick={() => this.uploadFiles()} disabled={!this.state.inited}>上传</Button><Button size='small' onClick={() => this.downloadFiles()} disabled={!this.getSelectedFiles().length}>下载</Button></Space>}</div>
             {
               this.renderSftpPanelTitle(type, username, host)
             }
@@ -1327,37 +1202,44 @@ export default class Sftp extends Component {
     )
   }
 
+  // 只显示当前会话文件，左侧目录树按需展开。
   renderSections () {
-    if (!this.isActive()) {
-      return null
+    if (!this.isActive()) return null
+    const { height, width } = this.props
+    const type = this.shouldRenderRemote() ? typeMap.remote : typeMap.local
+    const path = this.state[type + 'Path'] || '/'
+    const list = this.getFileList(type)
+    return <FileBrowser ready={this.state.inited} tabId={this.props.tab.id} key={type + (this.state.inited ? '-ready' : '-connecting')} width={width} height={height} currentPath={path} loading={this.state[type + 'Loading']} currentList={list} remote={type === typeMap.remote} listDirectory={(folder, refresh) => { const cache = this.getDirectoryCache(type); if (refresh) cache.invalidate(folder); return cache.read(folder) }} navigate={(folder, refresh = false) => this.navigateDirectory(type, folder, { refresh })} prefetchDirectory={folder => this.prefetchDirectory(type, folder)} onDirectoryAction={(action, folder, name) => this.directoryAction(type, action, folder, name)} renderFiles={fileWidth => this.renderSection(type, { width: fileWidth, height }, fileWidth)} />
+  }
+
+  // 目录树使用现有 SFTP 和本地文件接口，所有操作都针对右键选中的路径。
+  directoryAction = async (type, action, folder, name) => {
+    if (action === 'terminal') {
+      const terminalPath = type === typeMap.remote ? folder.replace(/^\/([a-zA-Z]:)(.*)$/, (match, drive, rest) => drive + rest.replace(/\//g, '\\')) : folder
+      refs.get('term-' + this.props.tab.id)?.cd(terminalPath)
+      return
     }
-    const arr = [
-      typeMap.local,
-      typeMap.remote
-    ]
-    const {
-      height, width
-    } = this.props
-    const shouldRenderRemote = this.shouldRenderRemote()
-    if (!shouldRenderRemote) {
-      return (
-        this.renderSection(arr[0], {
-          width,
-          left: 0,
-          top: 0,
-          height
-        }, width)
-      )
+    const remote = type === typeMap.remote
+    const parent = resolve(folder, '..')
+    const cache = this.getDirectoryCache(type)
+    if (action !== 'create' && (folder === '/' || /^[a-z]:[\\/]?$/i.test(folder))) throw new Error('不能修改根目录')
+    if (action === 'create') {
+      const target = resolve(folder, name)
+      if (remote) await this.sftp.mkdir(target)
+      else await window.fs.mkdir(target)
+      cache.invalidate(folder)
+    } else if (action === 'rename') {
+      const target = resolve(parent, name)
+      if (remote) await this.sftp.rename(folder, target)
+      else await window.fs.rename(folder, target)
+      cache.invalidate(parent)
+      return target
+    } else if (action === 'delete') {
+      if (remote) await this.sftp.rmdir(folder)
+      else await window.fs.rmrf(folder)
+      cache.invalidate(parent)
+      return parent
     }
-    return arr.map((t, i) => {
-      const style = {
-        width: width / 2,
-        left: i * width / 2,
-        top: 0,
-        height
-      }
-      return this.renderSection(t, style, width / 2)
-    })
   }
 
   render () {

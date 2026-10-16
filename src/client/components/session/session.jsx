@@ -1,9 +1,9 @@
 /**
  * terminal/sftp wrapper
  */
-import { createRef, lazy, Suspense } from 'react'
+import { createRef, Suspense } from 'react'
 import { Component } from 'manate/react/class-components'
-import Term from '../terminal/terminal.jsx'
+import ConsoleGroup from '../personal/console-group'
 import Sftp from '../sftp/sftp-entry'
 import {
   FullscreenOutlined
@@ -21,43 +21,44 @@ import {
   terminalVncType,
   terminalWebType,
   terminalTelnetType,
-  terminalFtpType,
   terminalSpiceType
 } from '../../common/constants'
 import { refs } from '../common/ref'
 import sanitizeFilename from '../../common/sanitize-filename.js'
-import SessionControl from './session-control'
-import LazyBoundary from '../common/lazy-boundary'
+import SessionControl from '../personal/session-control'
+import DatabasePanel from '../mysql/panel'
+import { databaseLayout } from '../mysql/layout'
+import { getWorkspaceState, registerWorkspaceState } from '../../common/workspace-state'
 import './session.styl'
 
-const RdpSession = lazy(() => import('../rdp/rdp-session'))
-const VncSession = lazy(() => import('../vnc/vnc-session'))
-const WebSession = lazy(() => import('../web/web-session.jsx'))
-const SpiceSession = lazy(() => import('../spice/spice-session'))
 const e = window.translate
 const SplitterPane = Splitter.Panel
 
 export default class SessionWrapper extends Component {
+  // 数据库布局属于当前标签页，不从其他标签页的操作继承状态。
   constructor (props) {
     super(props)
     this.domRef = createRef()
+    this.consoleRef = createRef()
+    const terminalPercent = Math.min(80, Math.max(20, props.config.personalTerminalPercent || 60))
+    const saved = getWorkspaceState(props.tab.id, 'layout')
     this.state = {
-      cwd: '',
-      sftpPathFollowSsh: !!props.config.sftpPathFollowSsh,
+      cwd: saved.cwd || '',
+      sftpPathFollowSsh: saved.sftpPathFollowSsh ?? Boolean(props.config.sftpPathFollowSsh),
       key: Math.random(),
-      splitSize: [50, 50],
+      splitSize: saved.splitSize || [terminalPercent, 100 - terminalPercent],
+      databaseMode: saved.databaseMode || 'expanded',
+      shellPercent: saved.shellPercent ?? 50,
       sessionOptions: null,
       broadcastInput: false,
       keepaliveEnabled: false,
-      wrapDisabled: false
+      wrapDisabled: false,
+      consoleDetached: false
     }
     if (props.tab.sshSftpSplitView === undefined) {
       props.tab.sshSftpSplitView = !!props.config.sshSftpSplitView
     }
   }
-
-  minWithForSplit = 640
-  minHeightForSplit = 400
 
   getDom = () => {
     return this.domRef.current
@@ -84,18 +85,10 @@ export default class SessionWrapper extends Component {
     window.store.triggerResize()
   }
 
-  canSplitView = () => {
-    const {
-      width,
-      height
-    } = this.props
-    if (this.isDisabled()) {
-      return false
-    }
-    return width > this.minWithForSplit ||
-      height > this.minHeightForSplit
-  }
+  // 个人版始终保留上下目录分区，窄窗口交由分隔线和内部滚动适配。
+  canSplitView = () => !this.isDisabled()
 
+  // 个人版固定为上方终端、下方文件。
   getSplitDirection = () => {
     const {
       sshSftpSplitView
@@ -103,14 +96,7 @@ export default class SessionWrapper extends Component {
     if (!sshSftpSplitView || !this.canSplitView()) {
       return 'tabed'
     }
-    const {
-      width,
-      height
-    } = this.props
-    const ratio = width / height
-    const baseRatio = this.minWithForSplit / this.minHeightForSplit
-    const wider = ratio > baseRatio
-    return wider ? 'leftRight' : 'topDown'
+    return 'topDown'
   }
 
   handleClick = () => {
@@ -230,90 +216,8 @@ export default class SessionWrapper extends Component {
       tab
     } = this.props
     const {
-      pane, type, sshSftpSplitView
+      pane, sshSftpSplitView
     } = tab
-    if (type === terminalWebType) {
-      const webProps = {
-        tab,
-        width: this.props.width,
-        height: this.props.height,
-        reloadTab: this.props.reloadTab
-      }
-      return (
-        <LazyBoundary>
-          <WebSession
-            {...webProps}
-          />
-        </LazyBoundary>
-      )
-    }
-    if (type === terminalRdpType || type === terminalVncType || type === terminalSpiceType) {
-      const rdpProps = {
-        tab: this.props.tab,
-        ...pick(this.props, [
-          'resolutions',
-          'height',
-          'width',
-          'tabsHeight',
-          'leftSidePanelWidth',
-          'pinned',
-          'openedSideBar',
-          'delTab',
-          'config',
-          'reloadTab',
-          'editTab',
-          'fullscreen'
-        ]),
-        ...pick(
-          this,
-          [
-            'fullscreenIcon'
-          ])
-      }
-      if (type === terminalVncType) {
-        return (
-          <LazyBoundary>
-            <VncSession
-              {...rdpProps}
-            />
-          </LazyBoundary>
-        )
-      }
-      if (type === terminalSpiceType) {
-        return (
-          <LazyBoundary>
-            <SpiceSession
-              {...rdpProps}
-            />
-          </LazyBoundary>
-        )
-      }
-
-      return (
-        <LazyBoundary>
-          <RdpSession
-            {...rdpProps}
-          />
-        </LazyBoundary>
-      )
-    }
-
-    if (type === terminalFtpType) {
-      const ftpProps = {
-        ...this.props,
-        ...pick(this, [
-          'onChangePane',
-          'setCwd'
-        ]),
-        isFtp: true
-      }
-      return (
-        <Sftp
-          {...ftpProps}
-        />
-      )
-    }
-
     const cls = pane === paneMap.terminal ||
       (sshSftpSplitView && this.canSplitView())
       ? 'terms-box'
@@ -345,10 +249,14 @@ export default class SessionWrapper extends Component {
         className={cls}
         style={{
           width,
-          height
+          height,
+          background: themeConfig.background,
+          '--terminal-background': themeConfig.background
         }}
       >
-        <Term
+        <ConsoleGroup
+          ref={this.consoleRef}
+          onDetachedChange={value => this.setState({ consoleDetached: value })}
           logName={logName}
           sessionOptions={sessionOptions}
           {...pops}
@@ -363,10 +271,10 @@ export default class SessionWrapper extends Component {
       type === terminalVncType ||
       type === terminalWebType ||
       type === terminalTelnetType ||
-      type === terminalFtpType ||
       type === terminalSpiceType
   }
 
+  // 按当前分区比例计算文件区尺寸。
   calcSftpWidthHeight = () => {
     const {
       width,
@@ -381,15 +289,17 @@ export default class SessionWrapper extends Component {
     const direction = this.getSplitDirection()
     const [, size2] = this.state.splitSize
     const w = direction === 'leftRight' ? size2 * width / 100 : width
-    const h = direction === 'leftRight' ? height : size2 * height / 100
+    const contentHeight = this.props.computeHeight(height)
+    const h = direction === 'leftRight' ? contentHeight : size2 * contentHeight / 100
     return {
       width: w,
       height: h
     }
   }
 
+  // 扣除工具栏后计算终端实际尺寸。
   calcTermWidthHeight = () => {
-    const width = this.getWidth()
+    const { shellWidth: width } = databaseLayout(this.getWidth(), this.state.databaseMode, this.state.shellPercent)
     const height = this.props.computeHeight(
       this.props.height
     )
@@ -528,17 +438,82 @@ export default class SessionWrapper extends Component {
     return tab.authType
   }
 
+  // 按实际面板总尺寸归一化，让窗口缩放时保持上下比例。
   onSplitResize = (sizes) => {
-    const direction = this.getSplitDirection()
-    const {
-      width,
-      height
-    } = this.props
-    const all = direction === 'leftRight' ? width : height
-    const size = sizes.map(d => d * 100 / all)
+    const all = sizes.reduce((sum, value) => sum + value, 0)
+    if (!all) return
+    const size = sizes.map(value => value * 100 / all)
     this.setState({
       splitSize: size
     })
+  }
+
+  // 松开拖动条时保存上下布局，避免拖动过程频繁写入数据库。
+  onSplitResizeEnd = (sizes) => {
+    this.onSplitResize(sizes)
+    const all = sizes.reduce((sum, value) => sum + value, 0)
+    if (all) window.store.setConfig({ personalTerminalPercent: sizes[0] * 100 / all })
+  }
+
+  // 工具栏只切换当前标签页；恢复时保留数据库连接和工作内容。
+  handleToggleDatabase = () => {
+    this.setState(previous => ({ databaseMode: previous.databaseMode === 'expanded' ? 'hidden' : 'expanded' }))
+  }
+
+  // 关闭时读取当前尺寸和显隐，重开保持同一标签页的布局。
+  componentDidMount () {
+    this.unregisterWorkspace = registerWorkspaceState(this.props.tab.id, 'layout', () => ({ cwd: this.state.cwd, sftpPathFollowSsh: this.state.sftpPathFollowSsh, splitSize: this.state.splitSize, databaseMode: this.state.databaseMode, shellPercent: this.state.shellPercent }))
+  }
+
+  // 拖动和目录跟随变化合并为本地快照，避免频繁磁盘写入。
+  componentDidUpdate (prevProps, prevState) {
+    if (prevState.splitSize !== this.state.splitSize || ['cwd', 'sftpPathFollowSsh', 'databaseMode', 'shellPercent'].some(key => prevState[key] !== this.state[key])) window.store.scheduleWorkspaceSave()
+  }
+
+  // 标签关闭时释放状态读取器。
+  componentWillUnmount () {
+    this.unregisterWorkspace?.()
+  }
+
+  // 最小化仅保留右侧窄栏，不销毁数据库或终端。
+  handleMinimizeDatabase = () => {
+    this.setState({ databaseMode: 'minimized' })
+  }
+
+  // 隐藏后可从当前标签页工具栏重新打开。
+  handleHideDatabase = () => {
+    this.setState({ databaseMode: 'hidden' })
+  }
+
+  // 从最小化窄栏恢复当前标签页原来的尺寸。
+  handleRestoreDatabase = () => {
+    this.setState({ databaseMode: 'expanded' })
+  }
+
+  // 拖动横向分隔线时同步终端的实际列数。
+  handleDatabaseResize = (sizes) => {
+    if (this.state.databaseMode !== 'expanded') return
+    const total = sizes.reduce((sum, size) => sum + size, 0)
+    if (total) this.setState({ shellPercent: sizes[0] * 100 / total })
+  }
+
+  // 拖动比例只保存在当前组件，不写入全局配置。
+  handleDatabaseResizeEnd = (sizes) => {
+    this.handleDatabaseResize(sizes)
+  }
+
+  // 终端右侧是可收起的 MySQL 工作区，继续使用统一的分隔线组件。
+  renderTerminalArea = () => {
+    const { databaseMode, shellPercent } = this.state
+    const expanded = databaseMode === 'expanded'
+    const layout = databaseLayout(this.props.width, databaseMode, shellPercent)
+    const { height } = this.calcTermWidthHeight()
+    return (
+      <Splitter className={'personal-database-splitter' + (expanded ? '' : ' database-closed')} style={{ width: this.props.width, height }} onResize={this.handleDatabaseResize} onResizeEnd={this.handleDatabaseResizeEnd}>
+        <SplitterPane size={layout.shellWidth} min={expanded ? layout.shellMin : 0} max={expanded ? this.props.width - layout.databaseMin : this.props.width} resizable={expanded} style={{ overflow: 'hidden' }}>{this.renderTerminals()}</SplitterPane>
+        <SplitterPane size={layout.databaseWidth} min={expanded ? layout.databaseMin : 0} resizable={expanded} style={{ overflow: 'hidden' }}><DatabasePanel tab={this.props.tab} height={height} mode={databaseMode} active={this.props.tab.id === this.props.activeTabId} onMinimize={this.handleMinimizeDatabase} onHide={this.handleHideDatabase} onRestore={this.handleRestoreDatabase} /></SplitterPane>
+      </Splitter>
+    )
   }
 
   renderViews = () => {
@@ -555,11 +530,11 @@ export default class SessionWrapper extends Component {
     const splitterProps = {
       orientation: layout,
       onResize: this.onSplitResize,
-      onResizeEnd: this.onSplitResize,
-      className: notSplitVew ? 'not-split-view' : '',
+      onResizeEnd: this.onSplitResizeEnd,
+      className: notSplitVew ? 'not-split-view' : 'personal-session-splitter',
       style: {
         width: this.props.width + 'px',
-        height: this.props.height + 'px'
+        height: this.props.computeHeight(this.props.height) + 'px'
       }
     }
     const paneProps = {
@@ -590,7 +565,7 @@ export default class SessionWrapper extends Component {
     return (
       <Splitter {...splitterProps}>
         <SplitterPane {...paneProps1}>
-          {this.renderTerminals()}
+          {this.renderTerminalArea()}
         </SplitterPane>
         <SplitterPane {...paneProps2}>
           {this.renderSftp()}
@@ -625,7 +600,11 @@ export default class SessionWrapper extends Component {
         {...divProps}
       >
         <SessionControl
+          consoleDetached={this.state.consoleDetached}
+          onToggleConsoleWindow={() => this.consoleRef.current?.togglePopout()}
           tab={this.props.tab}
+          databaseOpen={this.state.databaseMode === 'expanded'}
+          onToggleDatabase={this.handleToggleDatabase}
           isMobile={window.store.isMobile}
           isTouchDevice={window.store.isTouchDevice}
           isDisabled={this.isDisabled()}

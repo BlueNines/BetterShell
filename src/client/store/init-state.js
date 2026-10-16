@@ -55,6 +55,10 @@ export default () => {
   const leftSideBarOpen = storedSideBarOpen === '' ? true : storedSideBarOpen === 'true'
   return {
     // common
+    personalDialog: '',
+    personalBookmarkId: '',
+    externalEditorOpen: false,
+    externalEditorFiles: [],
     wsInited: false,
     configLoaded: false,
     initLoadingData: false,
@@ -118,12 +122,12 @@ export default () => {
     transferToConfirm: {},
     sftpSortSetting: ls.getItemJSON(sftpDefaultSortSettingKey, {
       local: {
-        prop: 'modifyTime',
-        direction: 'desc'
+        prop: 'name',
+        direction: 'asc'
       },
       remote: {
-        prop: 'modifyTime',
-        direction: 'desc'
+        prop: 'name',
+        direction: 'asc'
       }
     }),
     layout,

@@ -48,38 +48,11 @@ const defaultThemeLightFunc = () => {
     `)
 }
 
-const defaultThemeLightTerminal = () => {
-  return parsor(`
-background=#121214
-foreground=#af9a91
-cursor=#af9a91
-selectionBackground=#575256
-cursorAccent=#121214
-black=#572100
-red=#ba3934
-green=#91773f
-yellow=#b55600
-blue=#5f63b4
-magenta=#a17c7b
-cyan=#8faea9
-white=#af9a91
-brightBlack=#4e4b61
-brightRed=#d9443f
-brightGreen=#d6b04e
-brightYellow=#f66813
-brightBlue=#8086ef
-brightMagenta=#e2c2bb
-brightCyan=#a4dce7
-brightWhite=#d2c7a9
-    `
-  )
-}
-
 const defaultThemeDarkTerminal = () => {
   return {
-    foreground: '#bbbbbb',
-    background: '#20111b',
-    cursor: '#b5bd68',
+    foreground: '#d5deea',
+    background: '#17212e',
+    cursor: '#94b8ed',
     cursorAccent: '#1d1f21',
     selectionBackground: 'rgba(200, 200, 200, 0.6)',
     black: '#575757',
@@ -117,7 +90,7 @@ export function defaultThemeLight () {
   return {
     id: defaultThemeLightId,
     name: 'default light',
-    themeConfig: defaultThemeLightTerminal(),
+    themeConfig: { ...defaultThemeDarkTerminal(), background: '#f8fafc', foreground: '#334155', cursor: '#3976d2', selectionBackground: '#dce8f8' },
     uiThemeConfig: defaultThemeLightFunc()
   }
 }

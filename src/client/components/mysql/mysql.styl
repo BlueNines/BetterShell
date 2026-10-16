@@ -1,0 +1,522 @@
+.mysql-panel
+  height 100%
+  min-width 0
+  display flex
+  flex-direction column
+  overflow hidden
+  color var(--text)
+  background var(--personal-surface)
+  border-left 1px solid var(--personal-border)
+  container-type size
+  &[data-mode='hidden']
+    display none
+.mysql-expanded
+  flex 1
+  min-height 0
+  min-width 0
+  display flex
+  flex-direction column
+  overflow-x hidden
+  overflow-y auto
+  &[hidden]
+    display none
+.mysql-titlebar
+  min-height 29px
+  height 29px
+  flex-shrink 0
+  display flex
+  align-items center
+  gap 5px
+  padding 0 6px 0 9px
+  border-bottom 1px solid var(--personal-border)
+  background var(--personal-card)
+  > strong
+    white-space nowrap
+    font-size 12px
+    .anticon
+      color var(--personal-accent)
+  > .mysql-tab-caption
+    flex 1
+    min-width 0
+    color var(--text-dark)
+    font-size 10px
+    overflow hidden
+    text-overflow ellipsis
+    white-space nowrap
+  > .ant-btn
+    flex-shrink 0
+.mysql-minimized-rail
+  display flex
+  flex-direction column
+  align-items center
+  gap 12px
+  padding 7px 0
+  color var(--text-dark)
+  > .anticon
+    color var(--personal-accent)
+    font-size 16px
+  .mysql-rail-title
+    writing-mode vertical-rl
+    font-size 12px
+    letter-spacing 2px
+  .mysql-rail-status
+    font-size 10px
+    &.connected
+      color var(--success)
+.mysql-minimized
+  background var(--personal-card)
+.mysql-header
+  height 34px
+  min-height 34px
+  display flex
+  align-items center
+  gap 4px
+  padding 0 8px
+  border-bottom 1px solid var(--personal-border)
+  > .ant-select
+    flex 1
+    min-width 0
+    max-width 240px
+.mysql-error
+  flex-shrink 0
+  margin 5px 8px
+  padding 6px 10px
+  max-height 92px
+  overflow-y auto
+.mysql-connect-welcome
+  flex 1
+  display flex
+  flex-direction column
+  align-items center
+  justify-content center
+  gap 12px
+  text-align center
+  > .anticon
+    color var(--personal-accent)
+    font-size 30px
+  h3
+    margin 0
+    font-size 15px
+    font-weight 500
+  p
+    color var(--text-dark)
+    line-height 1.8
+    font-size 12px
+    margin 0 0 4px
+.mysql-saved-note
+  color var(--text-dark)
+  font-size 11px
+.mysql-workspace
+  flex 1
+  min-height 260px
+  display flex
+  overflow hidden
+.mysql-object-splitter
+  width 100%
+  height 100%
+  > .ant-splitter-bar
+    z-index 3
+    .ant-splitter-bar-dragger
+      &::before
+        background var(--personal-border)
+      &:hover::before
+        background var(--personal-accent)
+      &::after
+        height 30px
+        background var(--text-dark)
+  &.objects-hidden > .ant-splitter-bar
+    display none
+.mysql-objects
+  height 100%
+  min-width 0
+  min-height 0
+  display flex
+  flex-direction column
+  padding 0 6px
+  overflow hidden
+  border-right 1px solid var(--personal-border)
+  background var(--personal-card)
+  &[hidden]
+    display none
+  > .ant-input-affix-wrapper
+    flex-shrink 0
+    margin-bottom 5px
+  .ant-tree
+    background transparent
+    font-size 11px
+  .ant-tree-list-holder-inner
+    align-items flex-start !important
+  .ant-tree-treenode
+    width max-content
+    min-width 100%
+    flex-wrap nowrap
+  .ant-tree-node-content-wrapper
+    flex 1 0 auto !important
+    white-space nowrap
+  .ant-tree-title
+    white-space nowrap
+  .ant-tree-list-scrollbar-horizontal
+    height 7px !important
+.mysql-objects-heading
+  height 29px
+  min-height 29px
+  display flex
+  align-items center
+  justify-content space-between
+  color var(--text-dark)
+  font-size 11px
+  padding-left 3px
+  .ant-btn
+    font-size 10px
+.mysql-tree-viewport
+  flex 1
+  min-height 0
+  min-width 0
+  overflow hidden
+.mysql-content
+  height 100%
+  flex 1
+  min-width 0
+  min-height 0
+  display flex
+  flex-direction column
+  overflow hidden
+.mysql-object-toolbar
+  min-height 34px
+  height 34px
+  padding 4px 6px
+  display flex
+  gap 4px
+  border-bottom 1px solid var(--personal-border)
+  > .ant-select
+    min-width 0
+    flex 1 1 0
+  > .ant-btn
+    flex-shrink 0
+.mysql-content-spin
+  flex 1
+  min-height 0
+  overflow hidden
+  .ant-spin-container
+    height 100%
+.mysql-main-tabs
+  height 100%
+  display flex
+  flex-direction column
+  > .ant-tabs-nav
+    margin-bottom 0
+    min-height 32px
+    padding-left 10px
+  > .ant-tabs-body-holder
+    flex 1
+    min-height 0
+    overflow hidden
+    > .ant-tabs-body
+      height 100%
+      > .ant-tabs-content
+        height 100%
+        overflow hidden
+.mysql-data-view, .mysql-sql-view
+  height 100%
+  min-height 0
+  display flex
+  flex-direction column
+.mysql-actions
+  display flex
+  align-items center
+  gap 4px
+  padding 5px 6px
+  min-height 34px
+  flex-shrink 0
+  overflow-x auto
+  > .ant-btn
+    flex-shrink 0
+  > .ant-select
+    min-width 110px
+    max-width 165px
+  .mysql-table-caption
+    font-size 11px
+    color var(--text-dark)
+    white-space nowrap
+    overflow hidden
+    text-overflow ellipsis
+    margin-left 5px
+.mysql-filter
+  display flex
+  flex-wrap wrap
+  flex-shrink 0
+  gap 4px
+  padding 0 6px 5px
+  > .ant-select:first-child
+    flex 1 1 90px
+    width 120px
+    min-width 75px
+    flex-shrink 1
+  > .ant-select:nth-child(2)
+    width 70px
+    flex-shrink 0
+  > .ant-input
+    flex 1 1 80px
+    min-width 50px
+.mysql-grid
+  display flex
+  flex-direction column
+  flex 1
+  min-height 65px
+  overflow hidden
+  outline none
+  font-size 12px
+  border-top 1px solid var(--personal-border)
+  background var(--personal-surface)
+  &:focus-visible
+    box-shadow inset 0 0 0 1px var(--personal-accent)
+.mysql-grid-heading
+  position relative
+  height 30px
+  min-height 30px
+  background var(--personal-card)
+  overflow hidden
+  border-bottom 1px solid var(--personal-border)
+.mysql-grid-column
+  display flex
+  align-items center
+  justify-content space-between
+  gap 6px
+  position absolute
+  top 0
+  height 30px
+  padding 0 8px
+  border 0
+  border-right 1px solid var(--personal-border)
+  color var(--text)
+  background var(--personal-card)
+  font-size 11px
+  text-align left
+  cursor pointer
+  span
+    overflow hidden
+    white-space nowrap
+    text-overflow ellipsis
+  small
+    color var(--personal-accent)
+.mysql-grid-number
+  position absolute
+  z-index 2
+  left 0
+  width 38px
+  height 28px
+  line-height 28px
+  text-align right
+  padding-right 6px
+  background var(--personal-card)
+  color var(--text-dark)
+  font-size 10px
+  border-right 1px solid var(--personal-border)
+.mysql-grid-viewport
+  position relative
+  flex 1
+  min-height 0
+  overflow auto
+  scrollbar-gutter stable
+.mysql-grid-canvas
+  position relative
+.mysql-grid-row
+  position absolute
+  height 28px
+  background var(--personal-surface)
+  &:nth-child(even)
+    background var(--personal-card)
+  &.selected
+    background var(--personal-hover)
+    .mysql-grid-number
+      background var(--primary)
+.mysql-grid-cell
+  position absolute
+  top 0
+  height 28px
+  line-height 28px
+  padding 0 8px
+  overflow hidden
+  white-space nowrap
+  text-overflow ellipsis
+  border-right 1px solid var(--personal-border)
+  border-bottom 1px solid var(--personal-border)
+  font-variant-numeric tabular-nums
+  &.is-null
+    color var(--text-disabled)
+    font-style italic
+    font-size 10px
+  &.is-binary
+    color var(--personal-accent)
+    font-size 11px
+.mysql-grid-empty, .mysql-empty
+  padding 28px 10px
+  text-align center
+  color var(--text-dark)
+  font-size 12px
+.mysql-pagination
+  display flex
+  align-items center
+  justify-content flex-end
+  gap 5px
+  min-height 33px
+  padding 4px 6px
+  font-size 11px
+  border-top 1px solid var(--personal-border)
+  > span
+    margin-right auto
+    color var(--text-dark)
+  > .ant-select
+    width 90px
+.mysql-readonly-note
+  padding 3px 8px
+  color var(--text-dark)
+  background var(--personal-card)
+  font-size 10px
+  flex-shrink 0
+.mysql-structure-tabs
+  height 100%
+  min-height 0
+  padding 0 8px
+  .ant-tabs-nav
+    margin-bottom 5px
+  > .ant-tabs-body-holder
+    min-height 0
+    overflow auto
+.mysql-ddl
+  display flex
+  flex-direction column
+  align-items flex-end
+  gap 6px
+  height 100%
+  > textarea
+    height 220px
+    font-family monospace
+.mysql-sql-shortcut
+  color var(--text-dark)
+  font-size 10px
+  margin-left auto
+  white-space nowrap
+.mysql-sql-editor.ant-input
+  min-height 78px
+  height 32%
+  max-height 230px
+  border-radius 0
+  border-left 0
+  border-right 0
+  resize vertical
+  font-family 'Maple Mono', Consolas, monospace
+  font-size 12px
+  line-height 1.7
+  flex-shrink 0
+.mysql-query-result-bar
+  display flex
+  align-items center
+  gap 6px
+  padding 5px 6px
+  flex-shrink 0
+  .ant-select
+    flex 1
+    min-width 80px
+.mysql-query-summary
+  color var(--success)
+  font-size 11px
+  padding 6px 8px
+.mysql-status
+  min-height 23px
+  display flex
+  align-items center
+  justify-content space-between
+  gap 15px
+  padding 0 8px
+  border-top 1px solid var(--personal-border)
+  color var(--text-dark)
+  font-size 10px
+  span:last-child
+    white-space nowrap
+    overflow hidden
+    text-overflow ellipsis
+  .connected
+    color var(--success)
+.mysql-record-fields
+  max-height 440px
+  overflow-y auto
+  padding 5px 0
+.mysql-record-field
+  display grid
+  grid-template-columns 145px 75px 1fr
+  align-items start
+  gap 8px
+  margin 9px 0
+  label
+    font-size 12px
+    overflow-wrap anywhere
+  small
+    display block
+    color var(--text-dark)
+    font-size 10px
+    margin-top 3px
+.mysql-cell-value
+  font-family monospace
+.mysql-history
+  max-height 430px
+  overflow-y auto
+  button
+    display block
+    width 100%
+    border 1px solid var(--personal-border)
+    background var(--personal-card)
+    color var(--text)
+    text-align left
+    border-radius 6px
+    padding 9px
+    margin-bottom 7px
+    cursor pointer
+  small
+    color var(--text-dark)
+  pre
+    margin 4px 0 0
+    font-size 11px
+    max-height 70px
+    overflow hidden
+    white-space pre-wrap
+@container (max-width: 530px)
+  .mysql-table-caption, .mysql-sql-shortcut
+    display none
+@container (max-width: 420px)
+  .mysql-filter
+    > .ant-select:first-child
+      min-width 60px
+    > .ant-input
+      min-width 20px
+  .mysql-pagination
+    flex-wrap wrap
+    > span
+      flex 1
+  .mysql-tab-caption
+    display none
+@container (max-height: 380px)
+  .mysql-titlebar
+    height 26px
+    min-height 26px
+  .mysql-header
+    height 30px
+    min-height 30px
+  .mysql-object-toolbar
+    height 30px
+    min-height 30px
+  .mysql-main-tabs > .ant-tabs-nav
+    min-height 29px
+    .ant-tabs-tab
+      padding 4px 0
+  .mysql-actions
+    min-height 28px
+    padding 3px 6px
+  .mysql-filter
+    padding-bottom 3px
+  .mysql-pagination
+    min-height 31px
+    padding 3px 6px
+  .mysql-sql-editor.ant-input
+    min-height 56px
+    height 26%

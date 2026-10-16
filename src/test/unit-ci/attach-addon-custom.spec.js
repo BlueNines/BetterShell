@@ -3,8 +3,52 @@ const assert = require('node:assert/strict')
 
 global.window = global.window || { xtermAddons: {} }
 global.window.xtermAddons = global.window.xtermAddons || {}
+global.document = global.document || { hidden: false }
 
 const loadModule = () => import('../../client/components/terminal/attach-addon-custom.js')
+
+describe('terminal initial output', () => {
+  test('receives the first screen while the input addon is still loading and removes listeners on close', async () => {
+    const { default: AttachAddonCustom } = await loadModule()
+    const socket = new EventTarget()
+    const writes = []
+    const responses = []
+    let finishLoad
+    let input
+    // 首屏中的终端查询模拟 xterm 自动生成回应。
+    const terminal = { write: value => { writes.push(value); input?.('DSR_RESPONSE') }, onData: handler => { input = handler; return { dispose () {} } }, onBinary: () => ({ dispose () {} }) }
+    const addon = new AttachAddonCustom(terminal, socket)
+    addon._initBase = () => new Promise(resolve => { finishLoad = () => { addon._sendData = data => responses.push(data); resolve() } })
+    const activating = addon.activate()
+    assert.equal(socket.binaryType, 'arraybuffer')
+    socket.dispatchEvent(new MessageEvent('message', { data: new TextEncoder().encode('SCREEN_FIRST_FRAME').buffer }))
+    assert.deepEqual(writes, [])
+    assert.equal(addon._writeBuffer.join(''), 'SCREEN_FIRST_FRAME')
+    finishLoad()
+    await activating
+    assert.deepEqual(writes, ['SCREEN_FIRST_FRAME'])
+    assert.deepEqual(responses, ['DSR_RESPONSE'])
+    socket.dispatchEvent(new Event('close'))
+    socket.dispatchEvent(new MessageEvent('message', { data: 'MUST_NOT_WRITE' }))
+    assert.deepEqual(writes, ['SCREEN_FIRST_FRAME'])
+    assert.equal(addon.disposed, true)
+    assert.equal(addon._disposables.length, 0)
+  })
+
+  test('closing during input addon loading does not register terminal input afterward', async () => {
+    const { default: AttachAddonCustom } = await loadModule()
+    const socket = new EventTarget()
+    let finishLoad
+    const terminal = { onData: () => assert.fail('closed input registered'), onBinary: () => assert.fail('closed binary registered') }
+    const addon = new AttachAddonCustom(terminal, socket)
+    addon._initBase = () => new Promise(resolve => { finishLoad = resolve })
+    const activating = addon.activate()
+    socket.dispatchEvent(new Event('close'))
+    finishLoad()
+    await activating
+    assert.equal(addon._disposables.length, 0)
+  })
+})
 
 describe('terminal output truncation', () => {
   test('removes cursor operations after safe leading ANSI sequences', async () => {

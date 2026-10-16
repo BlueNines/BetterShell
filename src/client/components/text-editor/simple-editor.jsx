@@ -190,7 +190,7 @@ export default function SimpleEditor (props) {
         <Input.Search
           value={searchKeyword}
           onChange={handleChange}
-          placeholder='Search in text...'
+          placeholder='搜索文件内容…'
           allowClear
           enterButton={<SearchOutlined />}
           onSearch={handleSearch}

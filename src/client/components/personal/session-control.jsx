@@ -1,0 +1,8 @@
+import { Button, Space } from 'antd'
+import { ReloadOutlined, SearchOutlined, LinkOutlined, DatabaseOutlined, ExportOutlined } from '@ant-design/icons'
+
+// 会话工具栏提供数据库切换、连接信息、目录跟随、搜索和重连。
+export default function PersonalSessionControl ({ tab, sftpPathFollowSsh, toggleCheckSftpPathFollowSsh, onOpenSearch, databaseOpen, onToggleDatabase, consoleDetached, onToggleConsoleWindow }) {
+  const connection = tab.host ? `SSH · ${tab.username}@${tab.host}:${tab.port || 22}` : '本机终端 · PowerShell / CMD'
+  return <div className='personal-session-control'><span title={connection}>{connection}</span><Space size={4}><Button size='small' aria-label='切换数据库面板' title='切换数据库面板' type={databaseOpen ? 'primary' : 'text'} icon={<DatabaseOutlined />} onClick={onToggleDatabase}><span className='session-action-label'>数据库</span></Button><Button size='small' aria-label='目录跟随' type={sftpPathFollowSsh ? 'primary' : 'text'} icon={<LinkOutlined />} onClick={toggleCheckSftpPathFollowSsh} title='文件目录跟随终端'><span className='session-action-label'>目录跟随</span></Button><Button size='small' aria-label='搜索' title='搜索终端内容' type='text' icon={<SearchOutlined />} onClick={onOpenSearch}><span className='session-action-label'>搜索</span></Button><Button size='small' aria-label='重连' title='重连' type='text' icon={<ReloadOutlined />} onClick={() => window.store.reloadTab(tab.id)}><span className='session-action-label'>重连</span></Button><Button size='small' type='text' icon={<ExportOutlined />} aria-label={consoleDetached ? '合回控制台' : '弹出控制台窗口'} title={consoleDetached ? '合回控制台' : '弹出控制台窗口'} onClick={onToggleConsoleWindow} disabled={!consoleDetached && tab.status !== 'success'} /></Space></div>
+}

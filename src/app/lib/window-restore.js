@@ -1,5 +1,14 @@
 const minVisibleSize = 100
 
+// 显示并唤起主窗口，覆盖后台隐藏和最小化两种状态。
+exports.showMainWindow = function (win) {
+  if (!win || win.isDestroyed()) return false
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+  return true
+}
+
 function clamp (value, min, max) {
   return Math.min(Math.max(value, min), max)
 }
@@ -140,7 +149,7 @@ exports.restoreWindowBounds = ({
     : screen.getPrimaryDisplay()
   const { workArea } = targetDisplay
   const width = limitWindowSize(
-    windowSizeLastState.innerWidth,
+    windowSizeLastState.width || windowSizeLastState.innerWidth,
     windowSizeLastState.screenWidth,
     workArea.width,
     minWindowWidth

@@ -1,0 +1,584 @@
+html, body, #container
+  height 100%
+  overflow hidden
+  background var(--personal-bg, #101620)
+.sftp-table-content:focus-visible
+  outline 1px solid var(--personal-accent)
+  outline-offset -1px
+.personal-draggable-tabs > .tabs-inner.console-dock-target
+  box-shadow inset 0 0 0 2px var(--personal-accent)
+.personal-app
+  height 100%
+  color var(--text)
+  font-family 'Segoe UI', 'Microsoft YaHei', sans-serif
+  font-size 13px
+.personal-toolbar
+  position absolute
+  inset 0 0 auto 0
+  height 44px
+  display flex
+  align-items center
+  justify-content space-between
+  padding 0 14px
+  background var(--personal-surface)
+  border-bottom 1px solid var(--personal-border)
+  z-index 8
+.personal-brand, .personal-toolbar-actions
+  display flex
+  align-items center
+  gap 9px
+.personal-brand
+  flex-shrink 0
+.personal-toolbar-actions
+  min-width 0
+  .ant-btn
+    flex-shrink 0
+.personal-brand-mark
+  color var(--personal-accent)
+  font-family monospace
+  font-size 20px
+  font-weight 700
+.personal-version
+  color var(--text-dark)
+  font-size 11px
+  margin-left 4px
+.personal-monitor
+  z-index 4
+  position absolute
+  left 0
+  background var(--personal-surface)
+  border-right 1px solid var(--personal-border)
+  overflow hidden
+.personal-panel-heading
+  display flex
+  justify-content space-between
+  align-items center
+  height 38px
+  padding 0 14px
+  border-bottom 1px solid var(--personal-border)
+  color var(--text-dark)
+  font-size 12px
+  flex-shrink 0
+.personal-monitor-body
+  height calc(100% - 38px)
+  overflow-y auto
+  padding 16px 13px
+  scrollbar-gutter stable
+.personal-host
+  display flex
+  gap 10px
+  align-items center
+  > div:last-child
+    min-width 0
+  strong, small
+    display block
+    overflow hidden
+    text-overflow ellipsis
+    white-space nowrap
+  strong
+    color var(--text-light)
+    font-size 13px
+    font-weight 600
+  small
+    color var(--text-dark)
+    margin-top 4px
+    font-size 11px
+.personal-host-icon
+  flex 0 0 34px
+  height 34px
+  display grid
+  place-items center
+  border-radius 9px
+  background var(--primary)
+  color var(--personal-accent)
+  font-size 19px
+.personal-os
+  overflow-wrap anywhere
+  font-size 10px
+  color var(--text-dark)
+  margin 10px 0 14px
+  line-height 1.6
+.personal-state-pill
+  display inline-flex
+  align-items center
+  gap 5px
+  font-size 10px
+  i
+    width 5px
+    height 5px
+    border-radius 50%
+    background currentColor
+  &.online
+    color var(--success)
+.personal-overview
+  display grid
+  gap 9px
+  margin-bottom 16px
+  > div
+    display flex
+    flex-wrap wrap
+    justify-content space-between
+    gap 6px
+    align-items center
+  span
+    font-size 10px
+    color var(--text-dark)
+  strong
+    font-size 11px
+    font-weight 500
+    font-variant-numeric tabular-nums
+.personal-resource-card
+  padding 13px
+  background var(--personal-card)
+  border 1px solid var(--personal-border)
+  border-radius 10px
+  margin-bottom 10px
+.personal-card-label
+  display flex
+  align-items center
+  justify-content space-between
+  font-size 12px
+  font-weight 600
+  color var(--text-light)
+  small
+    font-weight 400
+    font-size 10px
+    color var(--text-dark)
+.personal-resource-value
+  margin 6px 0 4px
+  font-size 30px
+  font-weight 600
+  letter-spacing -1px
+  color var(--personal-accent)
+  font-variant-numeric tabular-nums
+.personal-chart
+  width 100%
+  height 44px
+  display block
+  color var(--personal-accent)
+.personal-chart-grid
+  stroke var(--personal-border)
+  stroke-width 1
+  fill none
+.personal-meter
+  height 5px
+  background var(--personal-border)
+  border-radius 5px
+  margin-top 11px
+  overflow hidden
+  i
+    display block
+    height 100%
+    background var(--personal-accent)
+    border-radius inherit
+  &.critical i
+    background var(--error)
+.personal-memory-card
+  .personal-card-label strong
+    color var(--personal-purple)
+  .personal-meter i
+    background var(--personal-purple)
+.personal-resource-detail, .personal-swap
+  display flex
+  flex-wrap wrap
+  justify-content space-between
+  gap 5px
+  font-size 10px
+  color var(--text-dark)
+  margin-top 9px
+.personal-swap
+  border-top 1px solid var(--personal-border)
+  padding-top 9px
+.personal-network
+  display grid
+  grid-template-columns repeat(2, minmax(0, 1fr))
+  gap 12px
+  margin 12px 0 7px
+  span, strong
+    display block
+  span
+    font-size 10px
+    color var(--text-dark)
+    margin-bottom 4px
+  strong
+    font-size 12px
+    font-weight 500
+    font-variant-numeric tabular-nums
+    overflow hidden
+    text-overflow ellipsis
+    white-space nowrap
+.personal-disk
+  margin-top 12px
+  > div:first-child
+    display flex
+    justify-content space-between
+    gap 8px
+    font-size 11px
+    span
+      overflow hidden
+      text-overflow ellipsis
+      white-space nowrap
+  strong
+    font-weight 500
+  small
+    display block
+    margin-top 7px
+    font-size 10px
+    color var(--text-dark)
+.personal-process-card
+  summary
+    font-size 12px
+    font-weight 600
+    cursor pointer
+    color var(--text-light)
+    small
+      float right
+      font-size 10px
+      color var(--text-dark)
+      font-weight 400
+.personal-process
+  display flex
+  align-items center
+  justify-content space-between
+  gap 8px
+  padding-top 11px
+  > div
+    min-width 0
+  strong
+    display block
+    overflow hidden
+    text-overflow ellipsis
+    white-space nowrap
+    font-size 11px
+    font-weight 400
+    max-width 155px
+  small
+    display block
+    margin-top 3px
+    font-size 9px
+    color var(--text-dark)
+  > span
+    flex-shrink 0
+    font-size 11px
+    color var(--personal-accent)
+.personal-session-tabs
+  position absolute
+  background var(--personal-bg)
+  z-index 5
+.personal-app
+  .tabs, .tabs-wrap
+    background var(--personal-bg)
+  .tabs
+    height 36px
+    position relative
+  .tabs-inner
+    width 100% !important
+    height 36px
+    display flex
+    overflow-x auto
+  .tab
+    flex 0 0 auto
+    width max-content
+    max-width none
+    padding-right 27px
+    height 36px
+    line-height 36px
+    background transparent
+    border-right 1px solid var(--personal-border)
+    box-shadow none
+    border-radius 0
+    color var(--text-dark)
+    > .tab-title
+      overflow visible
+      text-overflow clip
+    &.active
+      background var(--personal-surface)
+      color var(--text-light)
+      border-top 2px solid var(--personal-accent)
+  .session-wrap
+    box-shadow none
+  .term-sftp-box, .sftp-section
+    background var(--personal-surface)
+  .terms-box, .xterm
+    background var(--terminal-background, #17212e)
+  .xterm-screen::before
+    display none !important
+  .ant-splitter-bar-dragger::before
+    background var(--personal-border)
+  .ant-splitter-bar-dragger:hover::before
+    background var(--personal-accent)
+  .sftp-panel-title
+    display none
+  .sftp-panel
+    padding 0 10px
+  .sftp-item
+    height 27px
+    margin-bottom 0
+    font-size 12px
+  .sftp-file-prop
+    background transparent
+  .sftp-item:nth-child(even) .sftp-file-prop
+    background var(--personal-card)
+  .sftp-item.selected .sftp-file-prop, .sftp-item:hover .sftp-file-prop
+    background var(--personal-hover)
+    color var(--text-light)
+  .terms-box .term-wrap
+    background var(--terminal-background, #17212e)
+.personal-session-control
+  container-type inline-size
+  container-name session-controls
+  height 32px
+  display flex
+  align-items center
+  justify-content space-between
+  padding 0 12px
+  gap 8px
+  background var(--personal-surface)
+  border-bottom 1px solid var(--personal-border)
+  font-size 11px
+  color var(--text-dark)
+  > span
+    flex 1
+    min-width 0
+    overflow hidden
+    white-space nowrap
+    text-overflow ellipsis
+  > .ant-space
+    flex-shrink 0
+.personal-files
+  overflow hidden
+.personal-file-toolbar
+  height 31px
+  display flex
+  justify-content space-between
+  align-items center
+  color var(--text-dark)
+  font-size 11px
+.personal-add-tab
+  flex-shrink 0
+  height 36px
+  width 40px
+.personal-draggable-tabs
+  display flex
+  align-items center
+  .tabs-inner
+    width auto !important
+    flex 1
+    min-width 0
+  .tabs-wrapper
+    display flex
+    flex none
+    width max-content
+    min-width 100%
+  .personal-tab-scroll
+    flex 0 0 26px
+    width 26px
+    height 36px
+    padding 0
+    border-radius 0
+.personal-folder-tree
+  height 100%
+  min-width 0
+  overflow hidden
+  .personal-panel-heading
+    padding 0 10px
+  .ant-tree
+    padding 4px 0
+    font-size 12px
+    background var(--personal-surface)
+  .ant-tree-list-holder-inner
+    align-items flex-start !important
+  .ant-tree-treenode
+    width max-content
+    min-width 100%
+    flex-wrap nowrap
+  .ant-tree-node-content-wrapper
+    flex 1 0 auto !important
+    white-space nowrap
+  .ant-tree-title
+    white-space nowrap
+  .ant-tree-list-scrollbar-horizontal
+    height 7px !important
+.personal-tree-content
+  height calc(100% - 38px)
+  padding 0 4px
+.personal-tree-error
+  padding 8px 0
+  font-size 11px
+  color var(--error)
+.personal-directory-target
+  overflow-wrap anywhere
+  color var(--text-dark)
+  font-family monospace
+.personal-status
+  position absolute
+  inset auto 0 0 0
+  height 25px
+  padding 0 14px
+  display flex
+  align-items center
+  justify-content space-between
+  border-top 1px solid var(--personal-border)
+  background var(--personal-surface)
+  color var(--text-dark)
+  font-size 11px
+  z-index 8
+  > span:first-child
+    flex 1
+    min-width 0
+    overflow hidden
+    text-overflow ellipsis
+    white-space nowrap
+.personal-status-right
+  display flex
+  flex-shrink 0
+  gap 22px
+  button
+    border 0
+    background transparent
+    color inherit
+    cursor pointer
+.personal-status-dot
+  display inline-block
+  width 6px
+  height 6px
+  background var(--text-disabled)
+  border-radius 50%
+  margin-right 7px
+  &.success
+    background var(--success)
+  &.error
+    background var(--error)
+.personal-connections, .personal-command-history
+  width 330px
+  max-width calc(100vw - 48px)
+.personal-command-history
+  max-height 420px
+  overflow-y auto
+.personal-popover-title
+  display flex
+  justify-content space-between
+  padding 3px 0 12px
+  font-weight 600
+  span
+    color var(--text-dark)
+    font-size 11px
+    font-weight 400
+.personal-connection-list
+  max-height 330px
+  overflow-y auto
+  margin 8px -4px
+.personal-connection-row
+  display flex
+  align-items center
+  padding 5px 4px
+  border-radius 6px
+  &:hover
+    background var(--personal-hover)
+.personal-connection-name
+  flex 1
+  min-width 0
+  text-align left
+  border 0
+  background transparent
+  color var(--text)
+  cursor pointer
+  padding 5px
+  strong, small
+    display block
+    overflow hidden
+    text-overflow ellipsis
+    white-space nowrap
+  strong
+    font-weight 500
+  small
+    color var(--text-dark)
+    font-size 11px
+    margin-top 4px
+.personal-connection-actions
+  display flex
+  gap 6px
+  border-top 1px solid var(--personal-border)
+  padding-top 10px
+.personal-command-history button
+  display block
+  width 100%
+  padding 7px 3px
+  border 0
+  text-align left
+  background transparent
+  color var(--text)
+  font-family monospace
+  white-space nowrap
+  text-overflow ellipsis
+  overflow hidden
+  cursor pointer
+  &:hover
+    background var(--personal-hover)
+.personal-empty-note
+  color var(--text-dark)
+  font-size 11px
+  padding 10px 0
+.personal-form-row
+  display grid
+  grid-template-columns 1fr 145px
+  gap 14px
+  .ant-input-number, .ant-select
+    width 100%
+.personal-setting-row
+  display flex
+  align-items center
+  justify-content space-between
+  margin 20px 0
+  .ant-select
+    width 150px
+.personal-dialog-delete
+  float left
+.personal-welcome
+  position absolute
+  top 35%
+  right 0
+  text-align center
+  color var(--text-dark)
+  > .anticon
+    font-size 32px
+    color var(--personal-accent)
+  h2
+    margin-top 18px
+    font-size 19px
+    font-weight 500
+    color var(--text-light)
+  p
+    margin 12px 0 24px
+@media (max-width: 960px)
+  .personal-version
+    font-size 10px
+  .personal-toolbar
+    padding 0 8px
+  .personal-toolbar-actions
+    gap 3px
+@media (max-width: 860px)
+  .personal-version
+    display none
+  .personal-toolbar-actions .ant-btn > span:not(.ant-btn-icon)
+    display none
+@container session-controls (max-width: 520px)
+  .session-action-label
+    display none
+.personal-file-editor
+  padding 18px 0
+  border-bottom 1px solid rgba(128, 145, 168, .18)
+  .personal-file-editor-title
+    display flex
+    align-items center
+    justify-content space-between
+    gap 12px
+  .personal-file-editor-path
+    color #8498b6
+    overflow-wrap anywhere
+    margin 8px 0 12px
+    font-size 12px
+  .personal-file-editor-error
+    color #dc7272
+    margin 8px 0
+    overflow-wrap anywhere

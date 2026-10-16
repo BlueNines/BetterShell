@@ -1,7 +1,6 @@
 const express = require('express')
 const { Sftp } = require('./session-sftp')
 const { instSftpKeys } = require('../common/constants')
-const { Ftp } = require('./session-ftp')
 const {
   sftp,
   transfer,
@@ -11,7 +10,6 @@ const {
   cleanAllSessions
 } = require('./remote-common')
 const { Transfer, transferKeys } = require('./transfer')
-const { Transfer: FtpTransfer } = require('./ftp-transfer')
 const app = express()
 const log = require('../common/log')
 const appDec = require('./app-wrap')
@@ -92,6 +90,10 @@ function hasIncompleteTrailingUtf8 (bufs) {
 }
 
 appDec(app)
+// 数据库使用当前 SSH 的独立转发通道，与终端和 SFTP 共用会话生命周期。
+require('./mysql-session').registerMysql(app, verify, tabId => terminals(tabId)?.conn, markConnected)
+// 文件编辑使用独立通道，切换目录不会终止 Notepad++ 的保存同步。
+require('./remote-editor').registerRemoteEditor(app, verify, tabId => terminals(tabId)?.conn, markConnected)
 
 if (type === 'rdp') {
   app.ws('/rdp/:pid', function (ws, req) {
@@ -405,7 +407,7 @@ if (type === 'rdp') {
       log.debug('Closed terminal ' + pid)
       // Clean things up
       ws.close && ws.close()
-      cleanup()
+      if (!term.isScreen) cleanup()
     }
 
     term._wsCloseHandler = onClose
@@ -475,7 +477,7 @@ if (type === 'rdp') {
 
       if (action === 'sftp-new') {
         const { id, terminalId, type } = msg
-        const Cls = type === 'ftp' ? Ftp : Sftp
+        const Cls = Sftp
         sftp(id, new Cls({
           uid: id,
           terminalId,
@@ -548,7 +550,7 @@ if (type === 'rdp') {
           ws,
           encode
         })
-        const Cls = isFtp ? FtpTransfer : Transfer
+        const Cls = Transfer
         transfer(id, sftpId, new Cls(opts))
       } else if (action === 'transfer-func') {
         const { id, func, args, sftpId } = msg
@@ -639,20 +641,22 @@ process.on('message', async (message) => {
 })
 
 const runServer = function () {
-  return new Promise((resolve) => {
-    app.listen(wsPort, electermHost, () => {
-      log.info('session server', 'runs on', electermHost, wsPort)
-      resolve()
+  return new Promise((resolve, reject) => {
+    const server = app.listen(Number(wsPort) || 0, electermHost, () => {
+      const port = server.address().port
+      log.info('session server', 'runs on', electermHost, port)
+      resolve(port)
     })
+    server.once('error', reject)
   })
 }
 
 async function main () {
-  await runServer()
-  process.send({ serverInited: true })
+  const port = await runServer()
+  process.send({ serverInited: true, port })
 }
 
-main()
+main().catch(error => { log.error(error.message); process.exit(1) })
 
 let cleanupCalled = false
 function cleanup () {

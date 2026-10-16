@@ -22,6 +22,7 @@ export const configMixin = {
         prev !== curr
       ) {
         this.term.options[name] = curr
+        if (this.popout?.viewer) this.popout.viewer.options[name] = curr
         if (['fontFamily', 'fontSize'].includes(name)) {
           this.onResize()
         }

@@ -4,69 +4,35 @@ const path = require('path')
 // Map to store active terminal processes (pid -> {child, port, ws})
 const activeTerminals = new Map()
 
-// Track the last port assigned
-let lastPort = 30975
-const MIN_PORT = 30975
-const MAX_PORT = 65534
-// Add a set to track ports that are currently being assigned
-const pendingPorts = new Set()
-
-function getPort (fromPort = MIN_PORT) {
-  // Use the last port + 1 or start over if we've reached MAX_PORT
-  let startPort = lastPort >= MAX_PORT ? MIN_PORT : lastPort + 1
-
-  // Skip ports that are currently being assigned
-  while (pendingPorts.has(startPort)) {
-    startPort = startPort >= MAX_PORT ? MIN_PORT : startPort + 1
-  }
-
-  // Mark this port as pending
-  pendingPorts.add(startPort)
-
+// 让操作系统原子分配端口，多个标签同时恢复不会抢到同一个端口。
+async function runSessionServer (type) {
   return new Promise((resolve, reject) => {
-    require('find-free-port')(startPort, '127.0.0.1', function (err, freePort) {
-      if (err) {
-        // Remove from pending set on error
-        pendingPorts.delete(startPort)
-        reject(err)
-      } else {
-        // Remember this port for next time
-        lastPort = freePort
-        // Remove from pending set when done
-        pendingPorts.delete(startPort)
-        resolve(freePort)
-      }
-    })
-  })
-}
-
-async function runSessionServer (type, port) {
-  return new Promise((resolve) => {
-    const cleanEnv = Object.assign({}, process.env)
+    const cleanEnv = { ...process.env, wsPort: '0', type }
     delete cleanEnv.ELECTRON_RUN_AS_NODE
-    const child = fork(path.resolve(__dirname, './session-server.js'), {
-      env: Object.assign(
-        {
-          wsPort: port,
-          type
-        },
-        cleanEnv
-      ),
-      cwd: process.cwd()
-    }, (error, stdout, stderr) => {
-      if (error || stderr) {
-        console.error('Error in session server:', error || stderr)
-        throw error || stderr
-      }
-    })
-    child.on('message', (m) => {
-      if (m && m.serverInited) {
-        resolve(child)
-      }
-    })
+    const child = fork(path.resolve(__dirname, './session-server.js'), { env: cleanEnv, cwd: process.cwd() })
+    const timer = setTimeout(() => { child.kill(); fail(new Error('本地会话服务启动超时')) }, 15000)
+    // 启动失败必须返回错误，不能让终端永远停留在正在连接。
+    function fail (error) {
+      clearTimeout(timer)
+      child.removeListener('message', initialized)
+      reject(error)
+    }
+    // 监听成功后返回真实端口，后续 SSH 连接仍然独立并行。
+    function initialized (message) {
+      if (!message?.serverInited) return
+      clearTimeout(timer)
+      child.removeListener('message', initialized)
+      child.removeListener('error', fail)
+      child.removeListener('exit', exited)
+      resolve({ child, port: Number(message.port) })
+    }
+    // 子进程在就绪前退出时立即结束等待。
+    function exited () { fail(new Error('本地会话服务在就绪前退出')) }
+    child.on('message', initialized)
+    child.once('error', fail)
+    child.once('exit', exited)
   })
 }
-
 async function sendMsgToChildProcess (pid, msg, timeoutMs = 0) {
   const child = typeof pid === 'object' ? pid : activeTerminals.get(pid)?.child
   if (!child) {
@@ -170,9 +136,16 @@ function onChildExit (child) {
 }
 
 exports.terminal = async function (initOptions, ws, uid) {
+  // screen 子控制台复用父会话服务，关闭子标签不会终止父服务进程。
+  if (initOptions.screenSession && initOptions.screenParentId) {
+    const parent = activeTerminals.get(initOptions.screenParentId)
+    if (!parent || parent.screenParentId) throw new Error('对应 SSH 会话尚未连接')
+    await sendMsgToChildProcess(parent.child, { id: uid, action: 'create-terminal', body: initOptions }, 20000)
+    activeTerminals.set(initOptions.uid, { child: parent.child, port: parent.port, ws, screenParentId: initOptions.screenParentId })
+    return { pid: initOptions.uid, port: parent.port }
+  }
   const type = initOptions.termType || initOptions.type || 'terminal'
-  const port = await getPort()
-  const child = await runSessionServer(type, port)
+  const { child, port } = await runSessionServer(type)
   const pid = initOptions.uid
   const isSsh = ![
     'telnet',
@@ -196,7 +169,10 @@ exports.terminal = async function (initOptions, ws, uid) {
   }
   child.on('exit', () => {
     onChildExit(child)
-    activeTerminals.delete(pid)
+    for (const [id, entry] of activeTerminals) if (entry.child === child) activeTerminals.delete(id)
+  })
+  child.on('message', message => {
+    if (message?.terminalClosed && activeTerminals.get(message.terminalClosed)?.child === child) activeTerminals.delete(message.terminalClosed)
   })
   if (type !== 'ftp') {
     try {
@@ -234,8 +210,7 @@ exports.terminal = async function (initOptions, ws, uid) {
 
 exports.testConnection = async function (initOptions, ws, uid) {
   const type = initOptions.termType || initOptions.type || 'terminal'
-  const port = await getPort()
-  const child = await runSessionServer(type, port)
+  const { child } = await runSessionServer(type)
 
   const isSsh = ![
     'telnet',
@@ -342,10 +317,8 @@ exports.terminals = function (pid) {
  * Clean up all active terminals
  */
 exports.cleanupTerminals = function () {
-  for (const [pid, terminal] of activeTerminals) {
-    terminal.child.kill()
-    activeTerminals.delete(pid)
-  }
+  for (const child of new Set([...activeTerminals.values()].map(terminal => terminal.child))) child.kill()
+  activeTerminals.clear()
 }
 
 // Clean up on process exit

@@ -565,6 +565,19 @@ class TerminalSshBase extends TerminalBase {
   }
 
   openShell (shellWindow, shellOpts) {
+    // 顶层 screen 独立连接并直接附着，关闭普通 Shell 不会结束这个 screen 观看通道。
+    if (this.initOptions.screenSession) {
+      const { screenAttachCommand } = require('../common/screen-sessions.mjs')
+      return new Promise((resolve, reject) => {
+        this.conn.exec(screenAttachCommand(this.initOptions.screenSession), { pty: shellWindow }, (error, channel) => {
+          if (error) { reject(error); return }
+          this.channel = channel
+          this.setNoDelay(true)
+          globalState.setSession(this.pid, this)
+          resolve(this)
+        })
+      })
+    }
     return new Promise((resolve, reject) => {
       this.conn.shell(
         shellWindow,

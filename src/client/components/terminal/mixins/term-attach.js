@@ -1,8 +1,6 @@
 import { debounce } from 'lodash-es'
 import message from '../../common/message'
-import { notification } from '../../common/notification'
 import AttachAddon from '../attach-addon-custom.js'
-import { createTriggerManager } from '../automation/index.js'
 import { isWin } from '../../../common/constants.js'
 import { isUnsafeFilename } from '../../../common/file-drop-utils.js'
 import { createCdCommand } from '../ssh-reload-state.js'
@@ -26,7 +24,6 @@ export const attachMixin = {
     if (this.osc52Addon) {
       this.osc52Addon.setSendData(this.attachAddon._sendData.bind(this.attachAddon))
     }
-    this.initTriggerManager()
   },
 
   switchEncoding (encode) {
@@ -69,54 +66,11 @@ export const attachMixin = {
     }
   },
 
-  initTriggerManager () {
-    this.disposeTriggerManager()
-    if (!this.attachAddon) {
-      return
-    }
-    const attachAddon = this.attachAddon
-    this.triggerManager = createTriggerManager({
-      attachAddon,
-      send: (payload) => {
-        if (payload) {
-          attachAddon._sendData(payload)
-        }
-      },
-      getTriggers: () => {
-        try {
-          return window.store.getEffectiveTriggers(this.props.tab)
-        } catch (e) {
-          return []
-        }
-      },
-      onFire: ({ rule, matched, kind }) => {
-        if (kind === 'notify' && rule) {
-          notification.warning({
-            message: window.translate('triggers') + ': ' + (rule.name || rule.match?.value || ''),
-            description: String(matched || '').slice(-240),
-            duration: 6
-          })
-        }
-      }
-    })
-  },
+  // 个人版不启动自动化触发器。
+  refreshTriggers () {},
 
-  refreshTriggers () {
-    try {
-      this.triggerManager?.refresh()
-    } catch (e) {
-      console.debug(e)
-    }
-  },
-
-  disposeTriggerManager () {
-    try {
-      this.triggerManager?.dispose()
-    } catch (e) {
-      console.debug(e)
-    }
-    this.triggerManager = null
-  },
+  // 没有触发器资源需要释放。
+  disposeTriggerManager () {},
 
   // Called by attach-addon-custom once per flushed write, so the tab badge
   // updates without one notification per network chunk.

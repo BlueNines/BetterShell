@@ -2,6 +2,11 @@
 .terms-box
   background var(--main)
   position relative
+// 桌面滚动条持续可见，主控制台和独立窗口使用相同的可拖动轨道。
+.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical
+  opacity 1 !important
+  pointer-events auto !important
+  background rgba(148, 163, 184, .1)
 .loading-wrapper
   padding 30px
   z-index 100

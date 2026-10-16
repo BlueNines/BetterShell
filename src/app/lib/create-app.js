@@ -15,6 +15,7 @@ const { setupVvFileHandlers, openVvFileFromOs } = require('./vv-file-open')
 const { findVvFile } = require('../common/vv-file')
 const { handleSingleInstance } = require('./single-instance')
 const { setupCrashReporter, setupCommandLineSwitches } = require('./crash-reporter')
+const { showMainWindow } = require('./window-restore')
 
 let conf = {}
 
@@ -52,7 +53,10 @@ exports.createApp = async function () {
     }
 
     // Also use Electron's built-in lock as a fallback
-    app.requestSingleInstanceLock()
+    if (!app.requestSingleInstanceLock()) {
+      app.quit()
+      return app
+    }
   }
 
   app.on('second-instance', (event, commandLine) => {
@@ -75,12 +79,7 @@ exports.createApp = async function () {
       return
     }
     const win = globalState.get('win')
-    if (win) {
-      if (win.isMinimized()) {
-        win.restore()
-      }
-      win.focus()
-    }
+    showMainWindow(win)
   })
   app.whenReady().then(async () => {
     conf = await getDbConfig()
@@ -89,9 +88,7 @@ exports.createApp = async function () {
   app.on('activate', () => {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
-    if (globalState.get('win') === null) {
-      app.once('ready', () => createWindow(conf))
-    }
+    if (!showMainWindow(globalState.get('win'))) createWindow(conf)
   })
   return app
 }

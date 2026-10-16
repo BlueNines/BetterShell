@@ -4,9 +4,6 @@
 
 import handleError from '../common/error-handler'
 import Modal from '../components/common/modal'
-import { appendMandatoryGuardrails } from '../components/ai/ai-guardrails'
-import { buildSessionMessages } from '../components/ai/ai-context'
-import { COMPRESS_SUMMARY_PROMPT } from '../components/ai/ai-auto-compress'
 import { debounce, some, get, pickBy } from 'lodash-es'
 import {
   leftSidePanelWidthKey,
@@ -17,8 +14,6 @@ import {
   quickCommandsInRightPanelKey,
   addPanelWidthLsKey,
   connectionMap,
-  lastAiChatSessionIdKey,
-  aiAutoCompressLsKey,
   mobileBreakpoint,
   splitMap,
   settingAiId,
@@ -30,7 +25,6 @@ import { requireTermOfUse } from '../common/term-of-use'
 import { action } from 'manate'
 import uid from '../common/uid'
 import deepCopy from 'json-deep-copy'
-import { aiConfigsArr, optionalAIConfigsArr } from '../components/ai/ai-config-props'
 
 const e = window.translate
 const { assign } = Object
@@ -75,12 +69,6 @@ export default Store => {
     }, 300)
   }
 
-  Store.prototype.toggleAIConfig = function () {
-    requireTermOfUse('ai', () => {
-      window.store.showAIConfigModal = true
-    })
-  }
-
   Store.prototype.onResize = debounce(async function () {
     const { width, height } = await window.pre.runGlobalAsync('getScreenSize')
     const isMaximized = window.pre.runSync('isMaximized')
@@ -101,6 +89,7 @@ export default Store => {
     }
     window.pre.runGlobalAsync('setWindowSize', {
       ...update,
+      width: window.outerWidth,
       height: window.outerHeight
     })
   }, 100, {
@@ -403,266 +392,6 @@ export default Store => {
     return window.store.applyProfile(tab)
   }
 
-  Store.prototype.handleOpenAIPanel = function () {
-    const { store } = window
-    store.rightPanelVisible = true
-    store.rightPanelTab = 'ai'
-    // Ask for AI config right away when AI is not configured yet.
-    // This has to happen here (a plain user action) instead of from
-    // AIChat's mount effect: a write issued there lands in the very commit
-    // that opened the panel, and that update is dropped, so the config
-    // modal never showed up on first open.
-    if (store.aiConfigMissing()) {
-      store.toggleAIConfig()
-    }
-  }
-
-  // Same toggle contract as toggleInfoPanel: the footer AI button opens and
-  // closes its own panel. The open path must go through handleOpenAIPanel so
-  // the missing-config prompt still fires; closing must not touch config.
-  Store.prototype.toggleAIPanel = function () {
-    const { store } = window
-    if (store.rightPanelVisible && store.rightPanelTab === 'ai') {
-      store.rightPanelVisible = false
-      return
-    }
-    store.handleOpenAIPanel()
-  }
-
-  Store.prototype.explainWithAi = function (txt) {
-    const { store } = window
-    store.handleOpenAIPanel()
-    setTimeout(() => {
-      refsStatic.get('AIChat')?.setPrompt(`explain terminal output: ${txt}`)
-    }, 500)
-    setTimeout(() => {
-      refsStatic.get('AIChat')?.handleSubmit()
-    }, 1200)
-  }
-
-  Store.prototype.runCommandInTerminal = function (cmd) {
-    window.store.batchInputSelectedTabIds.forEach(id => {
-      refs.get('term-' + id)?.runQuickCommand(cmd)
-    })
-  }
-
-  // Update one entry immutably. Both halves matter:
-  // - the store only notifies subscribers on a property write, so mutating the
-  //   entry in place leaves the panel rendering what it already had;
-  // - the transcript is memo()'d per entry, and a memo() comparison of an entry
-  //   that was mutated in place compares the object with itself, so React can
-  //   never see the change and the entry stops updating.
-  Store.prototype.updateAiHistoryEntry = function (id, updates) {
-    const { aiChatHistory } = window.store
-    const index = aiChatHistory.findIndex(d => d.id === id)
-    if (index === -1) {
-      return
-    }
-    const next = [...aiChatHistory]
-    next[index] = { ...next[index], ...updates }
-    window.store.aiChatHistory = next
-  }
-
-  Store.prototype.removeAiHistory = function (id) {
-    const { store } = window
-    const index = store.aiChatHistory.findIndex(d => d.id === id)
-    if (index === -1) {
-      return
-    }
-    // Reassign instead of splice: the store only notifies subscribers on a
-    // property write, so an in-place mutation leaves the panel rendering the
-    // list it already had.
-    window.store.aiChatHistory = store.aiChatHistory.filter(d => d.id !== id)
-  }
-
-  Store.prototype.startNewChat = action(function () {
-    const { store } = window
-    store.currentChatSessionId = uid()
-    store.showChatSessions = false
-    window.localStorage.setItem(lastAiChatSessionIdKey, store.currentChatSessionId)
-  })
-
-  Store.prototype.loadChatSession = action(function (sessionId) {
-    const { store } = window
-    store.currentChatSessionId = sessionId
-    store.showChatSessions = false
-    window.localStorage.setItem(lastAiChatSessionIdKey, sessionId)
-  })
-
-  Store.prototype.deleteChatSession = action(function (sessionId) {
-    const { store } = window
-    const remaining = store.aiChatHistory.filter(d => d.chatSessionId !== sessionId)
-    store.aiChatHistory = remaining
-    if (store.currentChatSessionId === sessionId) {
-      store.startNewChat()
-    }
-  })
-
-  Store.prototype.clearAllChatSessions = action(function () {
-    const { store } = window
-    store.aiChatHistory = []
-    store.showChatSessions = false
-    store.startNewChat()
-  })
-
-  // One compression per session at a time. The placeholder entry is published
-  // before the summary arrives, so a second call (auto compress firing while a
-  // manual one is still waiting on the provider) would summarize the
-  // placeholder and append a second one.
-  const compressingSessions = new Set()
-
-  Store.prototype.compressChatSession = async function (sessionId) {
-    const { store } = window
-    if (!sessionId || compressingSessions.has(sessionId)) {
-      return
-    }
-    const sessionEntries = store.aiChatHistory
-      .filter(h => h.chatSessionId === sessionId)
-      .sort((a, b) => a.timestamp - b.timestamp)
-
-    // Find the last compress entry
-    let lastCompressIndex = -1
-    for (let i = sessionEntries.length - 1; i >= 0; i--) {
-      if (sessionEntries[i].compressed) {
-        lastCompressIndex = i
-        break
-      }
-    }
-
-    // Need at least 2 non-compress entries since the last compress
-    const entriesAfterCompress = lastCompressIndex >= 0
-      ? sessionEntries.slice(lastCompressIndex + 1)
-      : sessionEntries
-    if (entriesAfterCompress.length < 2) {
-      return
-    }
-
-    const firstEntry = sessionEntries[0]
-    const lang = firstEntry.languageAI || store.getLangName()
-    // Same message list the chat turn would send (including the response of
-    // every entry), so the summary describes the conversation the model
-    // actually saw.
-    const messages = buildSessionMessages({
-      history: store.aiChatHistory,
-      chatSessionId: sessionId,
-      role: appendMandatoryGuardrails(firstEntry.roleAI + `;用[${lang}]回复`)
-    })
-
-    // The same closing request the agent loop's auto compression sends (see
-    // components/ai/ai-compress.js), so both paths summarize alike.
-    messages.push({ role: 'user', content: COMPRESS_SUMMARY_PROMPT })
-
-    // Show the entry before asking for the summary, and fill it in when the
-    // answer arrives. The request takes as long as any other AI request (much
-    // longer for a nearly full session), and a click that changes nothing on
-    // screen for that long reads as "compress did not work".
-    const compressedEntry = {
-      id: uid(),
-      prompt: '*Compressed session summary*',
-      response: '*Summarizing the session…*',
-      isStreaming: false,
-      pending: false,
-      sessionId: null,
-      chatSessionId: sessionId,
-      mode: firstEntry.mode,
-      toolCalls: [],
-      nameAI: firstEntry.nameAI,
-      modelAI: firstEntry.modelAI,
-      roleAI: firstEntry.roleAI,
-      baseURLAI: firstEntry.baseURLAI,
-      apiPathAI: firstEntry.apiPathAI,
-      apiKeyAI: firstEntry.apiKeyAI,
-      proxyAI: firstEntry.proxyAI,
-      languageAI: firstEntry.languageAI,
-      authHeaderNameAI: firstEntry.authHeaderNameAI,
-      timestamp: Date.now(),
-      compressed: true
-    }
-
-    // Append compress entry, preserve existing history. Reassign rather than
-    // push for the same reason as removeAiHistory -- the panel has to see the
-    // new context size, which is the whole point of compressing.
-    store.aiChatHistory = [...store.aiChatHistory, compressedEntry]
-    compressingSessions.add(sessionId)
-
-    // Anything short of a usable summary takes the placeholder away again: an
-    // empty summary must never replace the conversation, and a half finished
-    // one must not look like a result.
-    const fail = (msg) => {
-      store.removeAiHistory(compressedEntry.id)
-      return store.onError(new Error(msg))
-    }
-
-    try {
-      const aiResponse = await window.pre.runGlobalAsync(
-        'AIchat',
-        COMPRESS_SUMMARY_PROMPT,
-        firstEntry.modelAI,
-        firstEntry.roleAI,
-        firstEntry.baseURLAI,
-        firstEntry.apiPathAI,
-        firstEntry.apiKeyAI,
-        firstEntry.proxyAI,
-        false,
-        firstEntry.authHeaderNameAI,
-        messages
-      )
-
-      if (aiResponse && aiResponse.error) {
-        return fail(aiResponse.error)
-      }
-
-      const summary = (aiResponse && aiResponse.response) || ''
-      if (!summary.trim()) {
-        return fail('Compression failed: empty summary from AI')
-      }
-      store.updateAiHistoryEntry(compressedEntry.id, { response: summary })
-    } finally {
-      compressingSessions.delete(sessionId)
-    }
-  }
-
-  // Auto compression, both modes: ask turns and the agent loop read this flag
-  // before every request (see components/ai/ai-compress.js), and the panel's
-  // auto compress popover writes it. Persisted so the choice survives a reload.
-  Store.prototype.setAiAutoCompress = action(function (val) {
-    const { store } = window
-    const on = !!val
-    store.aiAutoCompress = on
-    ls.setItem(aiAutoCompressLsKey, on ? 'true' : 'false')
-  })
-
-  Store.prototype.toggleChatSessions = action(function () {
-    const { store } = window
-    store.showChatSessions = !store.showChatSessions
-  })
-
-  Store.prototype.getChatSessions = function () {
-    const { aiChatHistory } = window.store
-    const sessionMap = new Map()
-    for (const entry of aiChatHistory) {
-      const sid = entry.chatSessionId
-      if (!sid) continue
-      if (!sessionMap.has(sid)) {
-        sessionMap.set(sid, {
-          sessionId: sid,
-          firstPrompt: entry.prompt || '',
-          timestamp: entry.timestamp,
-          messageCount: 1,
-          entries: [entry]
-        })
-      } else {
-        const session = sessionMap.get(sid)
-        session.messageCount++
-        session.entries.push(entry)
-        if (entry.timestamp > session.timestamp) {
-          session.timestamp = entry.timestamp
-        }
-      }
-    }
-    return Array.from(sessionMap.values()).sort((a, b) => b.timestamp - a.timestamp)
-  }
-
   Store.prototype.getLangName = function (
     lang = window.store?.config.language || 'en_us'
   ) {
@@ -707,12 +436,6 @@ export default Store => {
         delete p.isDefault
       }
     }
-  }
-
-  Store.prototype.aiConfigMissing = function () {
-    return aiConfigsArr
-      .filter(k => !optionalAIConfigsArr.includes(k))
-      .some(k => !window.store.config[k])
   }
 
   Store.prototype.clearHistory = function () {

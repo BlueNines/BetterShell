@@ -12,7 +12,7 @@ const {
   setWindowPos,
   repairFullScreenGeometry
 } = require('./window-control')
-const { ensureWindowVisible } = require('./window-restore')
+const { ensureWindowVisible, showMainWindow } = require('./window-restore')
 const { onClose } = require('./on-close')
 const { initIpc, initAppServer } = require('./ipc')
 const { disableShortCuts } = require('./key-bind')
@@ -36,6 +36,9 @@ function safeSend (win, channel, data) {
 }
 
 exports.createWindow = async function (userConfig) {
+  globalState.set('workspacePersistenceReady', false)
+  globalState.set('workspaceCloseReady', false)
+  globalState.set('workspaceClosePending', false)
   globalState.set('closeAction', 'closeApp')
   globalState.set('requireAuth', !!userConfig.hashedPassword)
   const { width, height, x, y } = await getWindowSize()
@@ -59,14 +62,18 @@ exports.createWindow = async function (userConfig) {
       preload: resolve(__dirname, '../preload/preload.js'),
       webviewTag: true,
       devTools: !userConfig.disableDeveloperTool,
-      spellcheck: false
+      spellcheck: false,
+      backgroundThrottling: false
     },
     titleBarStyle: useSystemTitleBar ? 'default' : 'hidden',
     icon: iconPath
   })
+  require('./terminal-popouts').configureTerminalPopouts(win)
   // Safety net: verify the window is actually visible on a connected
   // display and move it to the primary display if not.
   ensureWindowVisible(win, screen)
+  // 首次绘制后显式显示，避免 Windows 的隐藏启动标志留下后台窗口。
+  win.once('ready-to-show', () => showMainWindow(win))
   // hides the traffic lights
   if (isMac) {
     win.setWindowButtonVisibility(true)

@@ -11,7 +11,7 @@ import {
 } from '../../../common/constants.js'
 import getProxy from '../../../common/get-proxy.js'
 import { refs } from '../../common/ref.js'
-import { createTerm, resizeTerm } from '../terminal-apis.js'
+import { createTerm } from '../terminal-apis.js'
 import { ZmodemClient } from '../zmodem-client.js'
 import { TrzszClient } from '../trzsz-client.js'
 import { XmodemClient } from '../xmodem-client.js'
@@ -129,13 +129,14 @@ export const socketMixin = {
     // CMD vs PowerShell syntax; the global setting alone is not enough.
     this.localShell = execOpts[execPropName] || ''
     const opts = clone({
-      cols,
-      rows,
       term: terminalType || config.terminalType,
       saveTerminalLogToFile: config.saveTerminalLogToFile,
       ...tab,
       ...extra,
       ...execOpts,
+      // 实际终端尺寸优先于收藏中的旧值，PTY 必须从当前窗口的行列数启动。
+      cols,
+      rows,
       logName,
       sessionLogPath: this.state.logPath,
       ...pick(config, [
@@ -212,6 +213,7 @@ export const socketMixin = {
       try {
         await this.initAttachAddon()
         this.startupQueue.runInitScript(opts[execPropName])
+        this.props.onTerminalReady?.()
       } catch (e) {
         console.error(e)
         this.handleError({ message: e.message })
@@ -224,7 +226,8 @@ export const socketMixin = {
     term.buffer.onBufferChange(this.onBufferChange)
     const WebLinksAddon = await loadWebLinksAddon()
     term.loadAddon(new WebLinksAddon(this.webLinkHandler))
-    term.focus()
+    // 异步连接完成时只聚焦当前标签，并保留用户已经选中的文件区域。
+    if (this.props.tab.id === window.store.activeTabId) window.store.focus()
     this.zmodemClient = new ZmodemClient(this)
     this.zmodemClient.init(socket)
     this.trzszClient = new TrzszClient(this)
@@ -245,7 +248,7 @@ export const socketMixin = {
     // backend pty would otherwise be stuck at its initial (possibly wrong)
     // size forever. Sending explicitly here, keyed off the real pid,
     // guarantees the remote pty/ssh channel is told the true current size.
-    resizeTerm(this.pid, term.cols, term.rows)
+    this.onResizeTerminal({ cols: term.cols, rows: term.rows }, true)
     term.displayRaw = displayRaw
     term.loadAddon(
       new KeywordHighlighterAddon(keywords)

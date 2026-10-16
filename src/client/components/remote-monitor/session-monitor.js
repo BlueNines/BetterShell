@@ -8,6 +8,7 @@ import {
   parseCpu,
   parseDisks,
   parseMemory,
+  parseLoad,
   parseNetwork,
   parseSysInfo,
   parseUptime,
@@ -65,6 +66,7 @@ function parseGroup (name, results, sampleTimestamp, previousNetwork) {
   const result = results[0]
   if (name === 'cpu') return parseCpu(result)
   if (name === 'memory') return parseMemory(result)
+  if (name === 'load') return parseLoad(result)
   if (name === 'uptime') return parseUptime(result, sampleTimestamp)
   if (name === 'users') return parseUsers(result)
   if (name === 'disks') return parseDisks(result)

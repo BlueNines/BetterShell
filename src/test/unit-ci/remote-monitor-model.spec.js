@@ -58,7 +58,7 @@ describe('remote monitor command contract', () => {
   test('uses fixed read-only Linux commands and ADR intervals', () => {
     const commands = model.REMOTE_MONITOR_COMMANDS
     assert.deepStrictEqual(Object.keys(commands), [
-      'sysinfo', 'cpu', 'memory', 'network', 'uptime', 'users', 'disks', 'activities'
+      'sysinfo', 'cpu', 'memory', 'network', 'uptime', 'load', 'users', 'disks', 'activities'
     ])
     const text = JSON.stringify(commands)
     assert.equal(/sudo|kill|rm\s|shutdown|reboot/.test(text), false)
@@ -258,4 +258,12 @@ describe('remote monitor rate and visual helpers', () => {
     assert.equal(model.formatDuration(93784), '1d 02h 03m 04s')
     assert.equal(model.formatBytes(null), '—')
   })
+})
+
+// 验证个人版新增负载采样的合法响应和异常响应。
+test('parses Linux load averages without treating invalid data as zero', () => {
+  assert.deepEqual(model.parseLoad({ stdout: '0.00 1.25 2.50 2/530 1234', exitCode: 0 }), [0, 1.25, 2.5])
+  assert.equal(model.parseLoad({ stdout: '-1 2 3', exitCode: 0 }), null)
+  assert.equal(model.parseLoad({ stdout: '1 2', exitCode: 0 }), null)
+  assert.equal(model.parseLoad({ stdout: '1 2 3', exitCode: 1 }), null)
 })

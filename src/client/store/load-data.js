@@ -316,8 +316,10 @@ export default (Store) => {
       ext.initLoadingData = false
       Object.assign(store, ext)
       store.loadFontList()
-      store.fetchItermThemes()
-      store.openInitSessions()
+      const restored = await store.restoreWorkspaceSnapshot()
+      if (restored) store.confirmLoad()
+      else store.openInitSessions()
+      await window.pre.runGlobalAsync('enableWorkspacePersistence')
       store.fetchSshConfigItems()
       store.initCommandLine().catch(store.onError)
       initWatch(store)
@@ -337,9 +339,6 @@ export default (Store) => {
       if (store.config.checkUpdateOnStart) {
         store.onCheckUpdate(false)
       }
-      store.startAutoRunWidgets().catch(err => {
-        console.error('Failed to start autorun widgets:', err)
-      })
     } catch (err) {
       store.initLoadingData = false
       store.onError(err)

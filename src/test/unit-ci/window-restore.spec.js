@@ -131,6 +131,15 @@ function restore ({
 }
 
 describe('window bounds restoration', () => {
+  // 窗口边框不能被当成内容宽度丢弃，否则每次重启都会继续缩小。
+  it('restores the saved outer width without subtracting window borders', () => {
+    const { bounds } = restore({
+      displays: [display({ x: 0, y: 0, width: 1920, height: 1080 })],
+      windowSizeLastState: { width: 1700, innerWidth: 1684, height: 900, screenWidth: 1920, screenHeight: 1080 },
+      windowPosLastState: { x: 0, y: 0 }
+    })
+    assert.equal(bounds.width, 1700)
+  })
   it('uses the matching display work area on first launch', () => {
     const primary = display({
       x: 0,

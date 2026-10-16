@@ -4,6 +4,8 @@
 
 module.exports = exports.default = {
   hotkey: 'Control+2',
+  language: 'zh_cn',
+  personalUiMode: 'dark',
   sshReadyTimeout: 50000,
   scrollback: 3000,
   onStartSessions: [],
@@ -28,15 +30,15 @@ module.exports = exports.default = {
   terminalType: 'xterm-256color',
   keepaliveCountMax: 10,
   saveTerminalLogToFile: false,
-  checkUpdateOnStart: true,
+  checkUpdateOnStart: false,
   cursorBlink: false,
   cursorStyle: 'block',
-  useSystemTitleBar: false,
+  useSystemTitleBar: true,
   opacity: 1,
   defaultEditor: '',
   terminalWordSeparator: './\\()"\'-:,.;<>~!@#$%^&*|+=[]{}`~ ?',
   confirmBeforeExit: false,
-  initDefaultTabOnStart: true,
+  initDefaultTabOnStart: false,
   screenReaderMode: false,
   autoRefreshWhenSwitchToSftp: false,
   addTimeStampToTermLog: false,
@@ -67,7 +69,8 @@ module.exports = exports.default = {
   filePropsEnabled: [
     'name',
     'size',
-    'modifyTime'
+    'modifyTime',
+    'mode'
   ],
   hideIP: false,
   dataSyncSelected: 'all',
@@ -79,7 +82,7 @@ module.exports = exports.default = {
   authHeaderNameAI: 'Authorization: Bearer',
   proxyAI: '',
   sessionLogPath: '',
-  sshSftpSplitView: false,
+  sshSftpSplitView: true,
   showCmdSuggestions: false,
   restoreTerminalSessionOnReload: false,
   startDirectoryLocal: '',
@@ -88,8 +91,8 @@ module.exports = exports.default = {
   dragDropBehavior: 'ask',
   switchTabOnHover: false,
   autoDistributeTabsWhenLayoutChange: false,
-  disableShortcutBar: false,
-  onlyShowTitleInTab: false,
+  disableShortcutBar: true,
+  onlyShowTitleInTab: true,
   disableConfirmForLargeClipboardContent: false,
   doubleClickToOpenBookmark: false,
   leftSideBarIcons: [

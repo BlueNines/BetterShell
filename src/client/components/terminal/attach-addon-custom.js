@@ -155,6 +155,8 @@ export default class AttachAddonCustom {
     this._bidirectional = true
     this._disposables = []
     this._socket = socket
+    // 首屏可能早于动态插件加载返回，立即固定二进制类型，避免 Blob 被当成空字节。
+    this._socket.binaryType = 'arraybuffer'
     this.decoder = new TextDecoder('utf-8')
     this._lastDataTime = Date.now()
     this._lastInputTime = Date.now()
@@ -332,17 +334,20 @@ export default class AttachAddonCustom {
     }
   }
 
+  // 先订阅输出，动态加载输入插件期间服务器发来的首屏也必须保留。
   activate = async (terminal = this.term) => {
+    this._disposables.push(this.addSocketListener(this._socket, 'message', this.onMsg))
+    this._disposables.push(this.addSocketListener(this._socket, 'close', () => this.dispose()))
+    this._disposables.push(this.addSocketListener(this._socket, 'error', () => this.dispose()))
     await this._initBase()
-    this.addSocketListener(this._socket, 'message', this.onMsg)
+    if (this.disposed) return
 
     if (this._bidirectional) {
       this._disposables.push(terminal.onData((data) => this.sendToServer(data)))
       this._disposables.push(terminal.onBinary((data) => this.sendToServer(new Uint8Array(data))))
     }
-
-    this._disposables.push(this.addSocketListener(this._socket, 'close', () => this.dispose()))
-    this._disposables.push(this.addSocketListener(this._socket, 'error', () => this.dispose()))
+    // 输入已就绪再解析首屏，让服务端的终端查询能够收到 xterm 的回应。
+    if (this._writeBuffer.length) this._flushWrites()
   }
 
   onMsg = (ev) => {
@@ -521,6 +526,7 @@ export default class AttachAddonCustom {
     if (this._bufferChars > this._maxBufferChars) {
       this._dropOldestUntil()
     }
+    if (!this._sendData) return
     // A hidden window gets its timers throttled by Chromium (Electron's
     // backgroundThrottling defaults to true), which would stall the flush
     // timer and force the cap to drop real output. Nothing is painted
@@ -595,7 +601,9 @@ export default class AttachAddonCustom {
     term?.parent?.onTerminalWrite?.()
   }
 
-  sendToServer = (data) => {
+  sendToServer = (data, fromProjection = false) => {
+    // 弹出时仅由可见视图回答终端查询，避免 DSR 等回应重复进入远程程序。
+    if (this.term?.parent?.projectedInput && !fromProjection) return
     this._lastInputTime = Date.now()
     // Start echo detection when password prompt is suspected
     if (this._passwordPromptDetected && !this._pendingEchoCheck && data !== '\r' && data !== '\n' && data !== '\x03') {

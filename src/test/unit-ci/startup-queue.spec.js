@@ -68,6 +68,35 @@ const makeQueue = async (options) => {
 }
 
 describe('startup queue', () => {
+  // screen 内的服务程序不能接收到 Shell 注入、cd 或收藏启动脚本。
+  test('screen console never runs shell startup scripts or integration', async () => {
+    const { queue, addon, host } = await makeQueue({ runScripts: [{ script: 'dangerous-startup' }], sftpPathFollowSsh: true, isSsh: true, config: { showCmdSuggestions: true } })
+    host.props.tab.screenSession = '1234.main'
+    host.props.tab.startDirectory = '/somewhere'
+    queue.runInitScript()
+    await tick()
+    assert.deepEqual(addon.sent, [])
+    assert.equal(queue.canInjectShellIntegration(), false)
+    queue.dispose()
+  })
+  // 重开应用恢复目录但不重放启动脚本，之后主动重连可正常执行脚本。
+  test('workspace restore consumes its marker and skips scripts only once', async () => {
+    const { queue, addon, host } = await makeQueue({ runScripts: [{ script: 'startup-command' }] })
+    host.props.tab = { ...host.props.tab, type: 'ssh', _workspaceRestore: true, _reloadState: { cwd: '/home/qa/plugins' } }
+    host.isShellTerminal = () => true
+    host.isSsh = () => true
+    host.isLocal = () => false
+    queue.runInitScript()
+    await tick()
+    assert.equal(addon.sent.length, 1)
+    assert.ok(addon.sent[0].includes('/home/qa/plugins'))
+    assert.equal(host.props.tab._workspaceRestore, undefined)
+    queue.runInitScript()
+    await tick()
+    assert.equal(addon.sent[1], 'startup-command\r')
+    queue.dispose()
+  })
+
   test('runs every script once, in order', async () => {
     const { queue, addon } = await makeQueue({
       runScripts: [

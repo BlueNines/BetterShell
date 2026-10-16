@@ -2,10 +2,7 @@
  * db common methods
  */
 
-import {
-  settingMap
-} from '../common/constants'
-import { without, isArray } from 'lodash-es'
+import { isArray } from 'lodash-es'
 import handleError from './error-handler'
 import generate from './uid'
 import safeParse from './to-simple-obj'
@@ -23,32 +20,9 @@ const dbAction = (...args) => {
 /**
  * standalone db names
  */
-export const dbNames = [
-  ...without(
-    Object.keys(settingMap),
-    settingMap.setting,
-    settingMap.widgets
-  ),
-  'history',
-  'terminalCommandHistory',
-  'aiChatHistory',
-  'autoRunWidgets'
-]
-export const dbNamesForSync = [
-  ...without(
-    Object.keys(settingMap),
-    settingMap.setting,
-    settingMap.widgets
-  )
-]
-
-export const dbNamesForWatch = [
-  ...dbNamesForSync,
-  'history',
-  'terminalCommandHistory',
-  'aiChatHistory',
-  'autoRunWidgets'
-]
+export const dbNames = ['bookmarks', 'bookmarkGroups', 'terminalThemes', 'profiles', 'addressBookmarks', 'quickCommands', 'history', 'terminalCommandHistory']
+export const dbNamesForSync = []
+export const dbNamesForWatch = [...dbNames]
 
 /**
  * db insert

@@ -1,5 +1,6 @@
 import { Component } from 'manate/react/class-components'
 import Session from './session.jsx'
+import ScreenSession from '../personal/screen-session'
 
 import { pick } from 'lodash-es'
 import classNames from 'classnames'
@@ -51,7 +52,9 @@ export default class Sessions extends Component {
       const { id, batch } = tab
       // MCP/AI-created tabs may carry an out-of-range or missing batch.
       // Never crash the whole UI on bad data — fall back to batch 0 size.
-      const { height, width } = sizes[batch] || fallbackSize
+      const size = sizes[batch] || fallbackSize
+      const height = size.height
+      const width = tab.screenSession ? this.props.screenWidth || size.width : size.width
       const currentBatchTabId = this.props['activeTabId' + batch]
       const cls = classNames(
         `session-wrap session-${id}`,
@@ -61,7 +64,7 @@ export default class Sessions extends Component {
         }
       )
       const sessionWrapProps = {
-        style: this.computeSessionStyle(batch),
+        style: { ...this.computeSessionStyle(batch), left: tab.screenSession ? 0 : this.props.shellLeft || 0, width },
         className: cls
       }
       const sessProps = {
@@ -92,9 +95,11 @@ export default class Sessions extends Component {
       }
       return (
         <div {...sessionWrapProps} key={id}>
-          <Session
-            {...sessProps}
-          />
+          {tab.screenSession
+            ? <ScreenSession {...sessProps} />
+            : <Session
+                {...sessProps}
+              />}
         </div>
       )
     })

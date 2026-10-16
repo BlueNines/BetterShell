@@ -5,7 +5,6 @@
 import { useEffect } from 'react'
 import { Form, Button } from 'antd'
 import SimpleEditor from './simple-editor'
-import EditWithCustomEditor from './edit-with-custom-editor'
 
 const FormItem = Form.Item
 const e = window.translate
@@ -17,10 +16,12 @@ export default function TextEditorForm (props) {
     form.resetFields()
   }, [props.text])
 
+  // 提交当前配置文件内容。
   function submit () {
     form.submit()
   }
 
+  // 通过会话原有文件接口保存。
   async function handleSubmit (res) {
     props.submit(res)
   }
@@ -29,6 +30,7 @@ export default function TextEditorForm (props) {
   //   e.stopPropagation()
   // }
 
+  // 撤销本次编辑尚未保存的更改。
   function reset () {
     form.resetFields()
   }
@@ -37,12 +39,6 @@ export default function TextEditorForm (props) {
     text,
     loading
   } = props
-  const popsEdit = {
-    type: 'primary',
-    className: 'mg1r mg1b',
-    disabled: loading,
-    onClick: props.editWith
-  }
   const popsCancel = {
     type: 'dashed',
     onClick: props.cancel,
@@ -81,17 +77,6 @@ export default function TextEditorForm (props) {
           {...popsCancel}
         >{e('cancel')}
         </Button>
-      </div>
-      <div className='pd1t pd2b'>
-        <Button
-          {...popsEdit}
-        >
-          {e('editWithSystemEditor')}
-        </Button>
-        <EditWithCustomEditor
-          loading={loading}
-          editWithCustom={props.editWithCustom}
-        />
       </div>
     </Form>
   )

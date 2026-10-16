@@ -1,12 +1,14 @@
 /**
  * app entry
  */
-const { dialog } = require('electron')
+const { app, dialog } = require('electron')
 const log = require('./common/log')
 const { createApp } = require('./lib/create-app')
 const globalState = require('./lib/glob-state')
 
 globalState.set('initTime', Date.now())
+// 保存真实应用对象，让关闭窗口能够退出进程并释放单实例锁。
+globalState.set('app', app)
 
 log.debug('electerm start')
 
@@ -14,7 +16,7 @@ log.debug('electerm start')
 // unreadable config, a bad platform integration) used to surface only as an
 // UnhandledPromiseRejection while the app silently never opened a window.
 // Fail loudly instead, so the next one of these is diagnosable from the message.
-const app = createApp().catch((err) => {
+createApp().catch((err) => {
   log.error('Failed to start electerm:', err)
   try {
     dialog.showErrorBox(
@@ -24,4 +26,3 @@ const app = createApp().catch((err) => {
   } catch (_) {}
   process.exit(1)
 })
-globalState.set('app', app)

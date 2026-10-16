@@ -67,6 +67,8 @@ class ShortcutControl extends React.PureComponent {
 
   // SFTP shortcuts handler
   handleSftpKeyboardEvent = (e) => {
+    // 目录树独立处理键盘；文件列表的导航交给列表，避免全局捕获抢先打开旧选择。
+    if (e.target.closest('.personal-folder-tree') || (e.target.closest('.sftp-table-content') && ['Enter', 'ArrowUp', 'ArrowDown'].includes(e.key))) return
     const activeSftp = this.getActiveSftp()
     if (!activeSftp || activeSftp.state.onDelete || isInputActive()) {
       return

@@ -18,6 +18,7 @@ import { debounce, isEmpty } from 'lodash-es'
 import deepCopy from 'json-deep-copy'
 import { refsStatic } from '../components/common/ref'
 import dataCompare from '../common/data-compare'
+import { pruneExternalEditors } from '../common/external-editor'
 
 export default store => {
   for (const name of dbNamesForWatch) {
@@ -147,6 +148,15 @@ export default store => {
   autoRun(() => {
     ls.setItemJSON(syncServerDataKey, store.syncServerStatus)
     return store.syncServerStatus
+  }).start()
+
+  autoRun(() => {
+    // 标签数量、顺序和当前标签一起保存，不依赖连接配置的变化。
+    const tabs = store.tabs.map(tab => [tab.id, tab.title, tab.isPinned, tab.screenTabsExpanded])
+    const activeTabId = store.activeTabId
+    pruneExternalEditors(tabs.map(tab => tab[0]))
+    store.scheduleWorkspaceSave()
+    return { tabs, activeTabId }
   }).start()
 
   autoRun(() => {

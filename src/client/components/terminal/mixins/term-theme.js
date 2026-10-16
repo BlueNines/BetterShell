@@ -77,24 +77,14 @@ export const themeMixin = {
     this.terminalColorQueryDisposables.length = 0
   },
 
+  // 终端背景独立于浅色工具栏。
   getVisibleTerminalBackground () {
-    const uiThemeConfig = window.store?.getUiThemeConfig?.() || {}
-    // The store value (uiThemeConfig.main) is always immediately up-to-date
-    // when the theme changes, because it reads directly from store.config.theme.
-    // The CSS --main variable lags behind because UiTheme's useEffect runs
-    // asynchronously after componentDidUpdate. So we prioritise the store
-    // value, and only fall back to CSS (for custom-CSS edge cases) or the
-    // terminal theme background (last resort).
-    const root = document.documentElement
-    const cssMain = root && window.getComputedStyle
-      ? window.getComputedStyle(root).getPropertyValue('--main').trim()
-      : ''
-    return uiThemeConfig.main || cssMain || this.props.themeConfig.background
+    return this.props.themeConfig.background
   },
 
+  // 使用终端自身的前景色保证可读性。
   getVisibleTerminalForeground () {
-    const uiThemeConfig = window.store?.getUiThemeConfig?.() || {}
-    return uiThemeConfig.text
+    return this.props.themeConfig.foreground
   },
 
   registerTerminalColorQueryHandlers (term, themeConfig = {}) {
@@ -135,6 +125,11 @@ export const themeMixin = {
       return
     }
     term.options.theme = this.getRendererThemeConfig(this.props.themeConfig)
+    if (this.popout?.viewer) {
+      this.popout.viewer.options.theme = term.options.theme
+      const container = this.popout.window.document.querySelector('.console-popout-view')
+      if (container) container.style.background = this.props.themeConfig.background
+    }
     this.fixSelectionColors(term)
     term.refresh(0, term.rows - 1)
     if (deferred && this.props.config.rendererType === rendererTypes.webGL) {

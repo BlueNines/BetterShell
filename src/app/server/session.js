@@ -18,17 +18,10 @@ function loadModule (type) {
  * @returns {Promise} Terminal session
  */
 exports.startSession = async function (initOptions, ws, func = 'session') {
+  if (initOptions.screenSession && initOptions.screenParentId && func === 'session') return require('./session-screen').session(initOptions, ws)
   const type = initOptions.termType || initOptions.type || 'ssh'
-  const tail = [
-    'telnet',
-    'serial',
-    'local',
-    'rdp',
-    'vnc',
-    'spice'
-  ].includes(type)
-    ? type
-    : 'ssh'
+  if (!['ssh', 'local'].includes(type)) throw new Error('Unsupported connection type')
+  const tail = type
   const module = loadModule(tail)
   return module[func](initOptions, ws)
 }

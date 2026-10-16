@@ -8,7 +8,7 @@ import message from '../common/message'
 import {
   ArrowRightOutlined
 } from '@ant-design/icons'
-import Main from '../main/main.jsx'
+import Main from '../personal/main.jsx'
 import AppDrag from '../tabs/app-drag'
 import WindowControl from '../tabs/window-control'
 import './login.styl'

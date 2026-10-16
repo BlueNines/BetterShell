@@ -143,16 +143,21 @@ export class StartupQueue {
 
   runInitScript = (localShell) => {
     const { term } = this
+    // screen 通道直接执行附着操作，不能注入普通 Shell 脚本或目录命令。
+    if (term.props.tab.screenSession) return
     window.store.triggerResize()
     const {
       startDirectory,
       runScripts
     } = term.props.tab
 
-    const scripts = runScripts ? [...runScripts] : []
-    const reloadCwd = term.props.config.restoreTerminalSessionOnReload && this.isRestorable()
+    const workspaceRestore = term.props.tab._workspaceRestore
+    const scripts = runScripts && !workspaceRestore ? [...runScripts] : []
+    const reloadCwd = (term.props.config.restoreTerminalSessionOnReload || workspaceRestore) && this.isRestorable()
       ? term.props.tab._reloadState?.cwd
       : ''
+    // 恢复标记只消费一次；之后用户主动重连仍可执行收藏中的启动脚本。
+    delete term.props.tab._workspaceRestore
     const startFolder = reloadCwd || startDirectory || window.initFolder
     let cwdCommand = ''
     if (startFolder) {
@@ -322,6 +327,7 @@ export class StartupQueue {
   // ---- shell integration ----
 
   canInjectShellIntegration = () => {
+    if (this.term.props.tab.screenSession) return false
     const { config, sftpPathFollowSsh } = this.term.props
     return (
       config.showCmdSuggestions ||

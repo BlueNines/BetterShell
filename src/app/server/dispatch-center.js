@@ -8,7 +8,6 @@ const log = require('../common/log')
 const { Upgrade } = require('./download-upgrade')
 const { transferKeys } = require('./transfer')
 const fetch = require('./fetch')
-const sync = require('./sync')
 const {
   createTerm,
   testTerm,
@@ -36,6 +35,8 @@ function verify (req) {
 }
 
 const initWs = function (app) {
+  // 没有 SSH 会话的直连数据库使用主服务的同一受保护入口。
+  require('./mysql-session').registerMysql(app, verify)
   // upgrade
   app.ws('/upgrade/:id', (ws, req) => {
     verify(req)
@@ -84,8 +85,6 @@ const initWs = function (app) {
         const { action } = msg
         if (action === 'fetch') {
           fetch(ws, msg)
-        } else if (action === 'sync') {
-          sync(ws, msg)
         } else if (action === 'fs') {
           fs(ws, msg)
         } else if (action === 'create-terminal') {

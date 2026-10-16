@@ -39,7 +39,6 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      'ironrdp-wasm': resolve(cwd, '../../node_modules/ironrdp-wasm/pkg/rdp_client.js'),
       // @xterm/addon-ligatures bundles lru-cache@11, which calls
       // channel()/tracingChannel() from node:diagnostics_channel at import time.
       // In the renderer (browser) context Vite stubs Node builtins and the call
@@ -50,7 +49,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    exclude: ['ironrdp-wasm']
+    exclude: []
   },
   define: def,
   publicDir: false,

@@ -1,273 +1,48 @@
-<h1 align="center" style="padding-top: 60px;padding-bottom: 40px;">
-    <a href="https://electerm.org">
-        <img src="https://github.com/electerm/electerm-resource/raw/master/static/images/electerm.png", alt="" />
-    </a>
-</h1>
+# BetterShell
 
-[![GitHub version](https://badgers.space/github/release/electerm/electerm?corner_radius=m)](https://github.com/electerm/electerm/releases)
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/electerm/electerm/blob/master/LICENSE)
-[![GitHub Sponsors](https://img.shields.io/github/sponsors/electerm?label=Sponsors)](https://github.com/sponsors/electerm)
-[![star](https://atomgit.com/electerm/electerm/star/badge.svg)](https://atomgit.com/electerm/electerm)
+面向个人使用的 Windows SSH 服务器管理工具，基于 [Electerm](https://github.com/electerm/electerm) 5.5.76 做减法。
 
-[English](README.md) | [中文](build/docs/README_cn.md) | [日本語](build/docs/README_jp.md)
+## 核心功能
 
-Open-sourced terminal/ssh/sftp/telnet/serialport/RDP/VNC/Spice/ftp client(Linux, Mac, Windows, Android, HarmonyOS, iOS).
+- 保存 SSH 连接，支持密码与私钥认证、多标签和重连。
+- 每个 SSH Shell 标签右侧的「+」查找并连接 GNU screen，右拉条展开或收起这台 Shell 已打开的同级 screen 标签；screen 和普通控制台都可直接拖离标签栏成为独立窗口、拖回顶部或点击合回，同一会话不重连。
+- 终端与文件同屏：上方终端和 MySQL 工作区，下方目录树与文件列表。
+- 普通 Shell 和 screen 均可用滚轮或常显滚动条回看历史，弹出和合回保留位置。
+- MySQL / MariaDB 直连和 SSH 隧道；查看库表、字段和索引，执行 SQL，增删改记录，导出当前结果。
+- 各 Shell 标签页的数据库会话、SQL、结果、尺寸和显隐独立；支持最小化窄栏和隐藏，恢复保留工作区。
+- 关闭后自动保存整个工作区，下次启动恢复标签数量、顺序、目录和每页 MySQL 状态；已连接的数据库重新连接，SQL 草稿保留且不会自动执行。
+- MySQL 库表列表支持自动宽度、拖动分隔线和长名称横向滚动；点击「自动」恢复自适应。
+- SFTP 上传下载、配置文件编辑和基本文件操作。
+- 本地和远程文件默认按名称排序，大小列按数值混排文件和文件夹；点击列表后按字母定位、Enter 打开。
+- 近期目录缓存、空闲预读和鼠标停留预读，返回上级和再次进入更快；刷新和文件修改会更新缓存，本地目录属性一次批量读取。
+- 内置官方 Notepad++ 便携程序和简体中文语言，独立窗口支持多文件编辑；远程文件保存后自动同步，并提供每个文件的同步状态。
+- 左侧显示 CPU、内存、进程、网络、磁盘、负载和运行时间。
+- 中文界面、简洁配色；保留 PowerShell / CMD 本机终端入口。
+- 目录和上下分区可拖动并记住尺寸，深层目录支持横向滚动和右键操作。
+- 顶部标签随标题自动宽度，长名称完整保留；多标签可用左右按钮或滚轮浏览，加号固定在右侧，切换时自动定位当前标签。
+- 窄窗口工具栏自动收起文字；目录区保留，MySQL 短面板支持内部滚动，分页和 SQL 结果可继续操作。
+- 标签栏加号可搜索并打开已有服务器；设置中支持整个界面的深浅主题切换。
 
-Besides mainstream Windows/macOS/Linux/Android, electerm also supports HarmonyOS, iOS, and older systems — Ubuntu 18, Windows 7, macOS 10+, and special Chinese Linux distributions such as UOS, Kylin, and LoongArch (both old-world and new-world), as well as RISC-V (riscv64) and PowerPC 64-bit little-endian (ppc64le) Linux.
+个人版没有 AI、云同步、MCP、工具箱和远程桌面等扩展功能入口。
 
-<p>
-  <a href="https://electerm.org">Homepage / Downloads</a> ·
-  <a href="https://theme.electerm.org">Theme</a> ·
-  <a href="https://github.com/electerm/electerm-web-docker">Docker</a> ·
-  <a href="https://demo.electerm.org">Online demo</a> ·
-  <a href="https://github.com/electerm/electerm-android">Android</a> ·
-  <a href="https://github.com/electerm/electerm-harmony">HarmonyOS</a> ·
-  <a href="https://apps.apple.com/cn/app/electerm/id6792971552">Apple App Store</a> ·
-  <a href="https://appgallery.huawei.com/app/detail?id=org.electerm.electerm">Huawei AppGallery</a> ·
-  <a href="https://www.microsoft.com/store/apps/9NCN7272GTFF">Microsoft Store</a> ·
-  <a href="https://snapcraft.io/electerm">Snap Store</a> ·
-  <a href="https://repos.electerm.org/deb">deb repo</a> ·
-  <a href="https://repos.electerm.org/rpm">rpm repo</a>
-</p>
+## 运行与编译
 
-<div>🌐 <strong><a href="https://cloud.electerm.org">electerm online</a></strong> — Public free online electerm app</div>
-<div>🤖 <strong><a href="https://ai.electerm.org">electerm AI</a></strong> — Free AI for electerm users</div>
-<div>💻 <strong><a href="https://github.com/electerm/electerm-web">electerm-web</a></strong> — Web app version running in browser (including mobile device)</div>
-
-## Sponsors
-
-<div align="center">
-  <a href="https://www.atlascloud.ai/?ref=PCAEL2&utm_source=github&utm_medium=link&utm_campaign=electerm">
-    <img src="https://github.com/electerm/electerm-resource/blob/master/static/images/atlas-cloud.png?raw=true" alt="Atlas Cloud" width="260" />
-  </a>
-</div>
-
-[Atlas Cloud](https://www.atlascloud.ai/?ref=PCAEL2&utm_source=github&utm_medium=link&utm_campaign=electerm) provides OpenAI-compatible AI APIs and model access for AI-powered workflows in electerm.
-
-----
-
-<div align="center">
-  <a href="https://fluxionai.world/register?source=github&campaign=electerm-20260923&promo=ELECTERM&aff=7H7DERHU3GFF">
-    <img src="https://github.com/electerm/electerm-resource/blob/master/static/images/fluxionai.png?raw=true" alt="FluxionAI" width="210" />
-  </a>
-</div>
-
-[Fluxion AI](https://fluxionai.world/register?source=github&campaign=electerm-20260923&promo=ELECTERM&aff=7H7DERHU3GFF) — One gateway to the world's leading AI models, One API, multi-route delivery, transparent usage and pricing, Chinese Models — 60% OFF, Claude & OpenAI — 70% OFF [Register through the partner link
-Get $3 in API credit](https://fluxionai.world/register?source=github&campaign=electerm-20260923&promo=ELECTERM&aff=7H7DERHU3GFF).
-
-----
-
-<div align="center">
-  <br />
-  <br />
-  <a href="https://go.apimart.ai/gh-electerm">
-    <img src="https://github.com/electerm/electerm-resource/blob/master/static/images/apimart.jpg?raw=true" alt="ApiMart" width="200" />
-  </a>
-  <br />
-  <br />
-</div>
-
-Thanks to APIMart for sponsoring electerm! APIMart is a low-cost API platform for AI image & video generation — GPT-Image-2 from $0.006/image, 160+ images per dollar. One async API covers both image and video: submit a task, get an ID, fetch results via polling or callback. Batch tens of thousands of images without timeouts, switch models without changing code. Pay-as-you-go with no monthly fee — [sign up here to get started](https://go.apimart.ai/gh-electerm).
-
-----
-
-<div align="center">
-  <a href="https://www.apismart.ai">
-    <img src="https://github.com/electerm/electerm-resource/blob/master/static/images/apismart400x400.png?raw=true" alt="ApiSmart" width="200" />
-  </a>
-</div>
-
-[ApiSmart](https://www.apismart.ai) provides unified access to leading AI models through a single API. Use one API key to connect with LLM, image, and video models through an OpenAI-compatible interface, without managing multiple providers separately. Switch models easily, simplify billing, and improve reliability with intelligent routing and automatic failover. Build and scale AI applications faster with one streamlined API platform.
-
-----
-
-<div align="center">
-
-<a href="https://www.digitalocean.com/?refcode=c10bcb28b846&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge"><img align="middle" src="https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%202.svg" alt="DigitalOcean Referral Badge" /></a>&nbsp;&nbsp;&nbsp;<a href="https://oss-directory.vercel.app"><img align="middle" src="https://github.com/electerm/electerm-resource/blob/master/static/images/vercel-oss-2005.png?raw=true" alt="Vercel OSS Program" /></a>
-
-</div>
-
-<div align="center">
-    <img src="https://github.com/electerm/electerm-resource/raw/master/static/images/electerm-banner-1.jpg", alt="" />
-</div>
-
-## Features
-
-- Works as a terminal/file manager, ssh/sftp/ftp/telnet/serialport/RDP/VNC/Spice client
-- Support Window 7+(X64/ARM64), HarmonyOS，Android, iOS, Mac OS 10.15+(x64/arm64), Linux(x64/arm64/riscv64/ppc64le/Loong64 new world & old world), even old Linux with glibc 2.17+ like UOS/Kylin/Ubuntu 18.04 etc
-- Global hotkey to toggle window visibility (similar to guake, default is `ctrl + 2`)
-- 🇺🇸 🇨🇳 🇧🇷 🇷🇺 🇪🇸 🇫🇷 🇹🇷 🇭🇰 🇯🇵 🇸🇦 🇩🇪 🇰🇷 🇮🇩 🇵🇱 Multi-language support([electerm-locales](https://github.com/electerm/electerm-locales), contributions/fixes welcome)
-- Double click to directly edit (small) remote files.
-- All kind of auth methods: publicKey, password, ssh agent, certificates, otp, netbird etc.
-- Support Zmodem(rz, sz), and [Trzsz](https://github.com/trzsz/trzsz)(trz/tsz).
-- Support ssh related features: tunnel, connection hopping.
-- Customizable UI: themes, background image, transparent window(Mac, win).
-- Global/session proxy.
-- Quick commands/triggers to do predefined tasks and automattic operations
-- Sync data including bookmarks to github/gitee secret gist/webdav/custom server/electerm cloud
-- Quick input/mirror input to one or all terminals.
-- AI assistant integration (supporting multiple LLM API formats — OpenAI Chat Completions, OpenAI Responses, and Anthropic Messages) to help with command suggestions, script writing, and explaining selected terminal content, create bookmarks/themes, and agent mode to directly do terminal operations
-- MCP (Model Context Protocol) widget for AI assistants and external tools integration - see [MCP Widget Usage Guide](https://github.com/electerm/electerm/wiki/MCP-Widget-Usage-Guide)
-- Deep link support: Open connections with URLs like `telnet://192.168.2.31:34554` or `ssh://user@host:22` - see [Deep link support wiki](https://github.com/electerm/electerm/wiki/Deep-link-support)
-- Command line usage: check [wiki](https://github.com/electerm/electerm/wiki/Command-line-usage)
-
-## Install
-
-- For Mac user: `brew install --cask electerm`
-- With snap: `sudo snap install electerm --classic`
-- For some Linux distribution, you can find it from OS default App store(Ubuntu, Deepin, Mint...).
-- For some linux OS, the `rpm`, `deb`, or `snap` release may not work, you can try the `tar.gz` or `.appImage` release.
-- For Windows users, you can install it from [windows store](https://www.microsoft.com/store/apps/9NCN7272GTFF), command-line installer [winget](https://github.com/microsoft/winget-cli) and [scoop](https://github.com/lukesampson/scoop) is also recommended:
+当前版本为 **0.6.8**。安装 Node.js 24 和 Yarn 1 后，在 PowerShell 中克隆并编译：
 
 ```powershell
-# winget https://github.com/microsoft/winget-cli
-winget install electerm.electerm
-
-# scoop https://github.com/lukesampson/scoop
-scoop bucket add dorado https://github.com/chawyehsu/dorado
-scoop install dorado/electerm
+git clone https://github.com/BlueNines/BetterShell.git
+Set-Location BetterShell
+.\build-personal.ps1 -InstallDependencies
 ```
 
-- Install from Debian repository (for Debian/Ubuntu-based systems) with `apt` command
+构建完成后，运行 `dist/personal/win-unpacked/BetterShell.exe`。安装包和免安装 ZIP 位于 `dist/personal`；免安装包需要完整解压后运行。后续重新编译可直接运行 `./build-personal.ps1`。
 
-Check [https://repos.electerm.org/deb](https://repos.electerm.org/deb)
+仓库保存源码、构建脚本和测试；编译产物与本机连接配置不随源码提交。用户数据保存在 `%APPDATA%\BetterShell`。
 
-- Install from npm
+详见 [screen 与独立控制台说明](PERSONAL_V6.md)、[Notepad++ 文件编辑说明](PERSONAL_V5.md)、[工作区恢复说明](PERSONAL_V4.md)、[数据库功能说明](PERSONAL_V3.md)、[编译说明](BUILD_WINDOWS.md)、[第二版说明](PERSONAL_V2.md) 和 [第一版说明](PERSONAL_V1.md)。
 
-```bash
-npm i -g electerm
+## 许可证
 
-```
+继承 Electerm 的 MIT 许可证，保留原作者版权声明，详见 [LICENSE](LICENSE)。
 
-## Upgrade
-
-- Auto upgrade: When a new version is released, you will get an upgrade notification after you start electerm again. You can then click the upgrade button to upgrade.
-- Download: Just download the latest edition, reinstall.
-- Npm: If you install from npm, just run `npm i -g electerm` again.
-- If use Snap or some other distribution system, these systems may provide upgrades.
-
-## Known issues
-
-[https://github.com/electerm/electerm/wiki/Know-issues](https://github.com/electerm/electerm/wiki/Know-issues)
-
-## Troubleshoot
-
-[https://github.com/electerm/electerm/wiki/Troubleshoot](https://github.com/electerm/electerm/wiki/Troubleshoot)
-
-## Discussion
-
-[![Discord](https://img.shields.io/badge/Discord-Join-blue?logo=discord)](https://discord.gg/855W7g8EVd)
-
-[Discussion board](https://github.com/electerm/electerm/discussions)
-
-![electerm-wechat-group-qr.jpg](https://electerm.org/electerm-wechat-group-qr.jpg)
-
-## Support
-
-Would love to hear from you, please tell me what you think, [submit an issue](https://github.com/electerm/electerm/issues), [Start a new discussion](https://github.com/electerm/electerm/discussions/new), [create/fix language files](https://github.com/electerm/electerm-locales) or create pull requests, all welcome.
-
-## Sponsor this project
-
-github sponsor
-
-[https://github.com/sponsors/electerm](https://github.com/sponsors/electerm)
-
-kofi
-
-[https://ko-fi.com/zhaoxudong](https://ko-fi.com/zhaoxudong)
-
-wechat donate
-
-[![wechat donate](https://electerm.org/electerm-wechat-donate.png)](https://github.com/electerm)
-
-TRON TRN20
-
-[![TRN20 donate](https://github.com/electerm/electerm-resource/blob/master/static/images/trn20.png?raw=true)]
-
-Address: TXk3pQNmQu1vihH76RaEFnK9wg13x4LLCZ
-
-## Dev
-
-```bash
-# May only works in Linux
-# needs nodejs/npm, suggest using nvm to install nodejs/npm
-# with nodejs 24.x
-
-git clone git@github.com:electerm/electerm.git
-cd electerm
-npm config set legacy-peer-deps true
-npm i
-
-# start vite dev server, requires port 5570
-npm start
-
-# in a separate terminal session run app
-npm run app
-
-# code format check
-npm run lint
-
-# code format fix
-npm run fix
-```
-
-## Test
-
-```bash
-npm run b
-npm run prepare-test
-cp ./build/.sample.env ./.env
-
-# edit .env, fill your test host/username/password, may only works in mac OS
-npm run test
-```
-
-## Test build
-
-```bash
-# May only works in Linux
-# Install yarn first(to do yarn autoclean)
-# See https://yarnpkg.com/en/docs/install
-
-# Build linux only with -l
-npm i
-npm run b
-npm run pb
-./node_modules/.bin/electron-builder --linux tar.gz
-# or replace tar.gz to rpm/deb/AppImage
-# check dist/ folder
-
-# build for linux arm/
-./node_modules/.bin/electron-builder --linux --arm64
-```
-
-## Video guide
-
-- [https://electerm.org/videos](https://electerm.org/videos)
-
-## Change log
-
-Visit [Releases](https://github.com/electerm/electerm/releases).
-
-## Contact author
-
-[zxdong@gmail.com](mailto:zxdong@gmail.com)
-
-
-## License
-
-MIT
-
-## Star History
-
-<p>
- <a href="https://www.star-history.com/electerm/electerm"><img src="https://api.star-history.com/badge?repo=electerm/electerm" alt="Star History Rank" /></a>
-</p>
-
-<a href="https://www.star-history.com/?repos=electerm%2Felecterm&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=electerm/electerm&type=date&legend=top-left&sealed_token=DvPlttPaLtq6RPIWRANYX08-8ZJyrJalhombrkDcg1IwWOMPMIplgi85q0FiwrbhE3lRIi_yxvOWdell731CGQvzlfJMt2Sa6VfCvQ80BwEtQ6RpPchEiw" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=electerm/electerm&type=date&legend=top-left&sealed_token=DvPlttPaLtq6RPIWRANYX08-8ZJyrJalhombrkDcg1IwWOMPMIplgi85q0FiwrbhE3lRIi_yxvOWdell731CGQvzlfJMt2Sa6VfCvQ80BwEtQ6RpPchEiw" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=electerm/electerm&type=date&legend=top-left&sealed_token=DvPlttPaLtq6RPIWRANYX08-8ZJyrJalhombrkDcg1IwWOMPMIplgi85q0FiwrbhE3lRIi_yxvOWdell731CGQvzlfJMt2Sa6VfCvQ80BwEtQ6RpPchEiw" />
- </picture>
-</a>
+随附的独立 Notepad++ 程序遵循 GPL v3；产物的 `resources/notepad-plus-plus` 中包含其许可证、版本来源和对应源代码 ZIP。

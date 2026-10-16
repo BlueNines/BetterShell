@@ -15,8 +15,9 @@
  */
 
 import { Component, createRef } from 'react'
+import { FILE_ROW_HEIGHT } from '../../common/file-list-navigation'
 
-const ITEM_SIZE = 36 // 32px item height + 4px margin-bottom
+const ITEM_SIZE = FILE_ROW_HEIGHT
 const OVERSCAN = 5
 
 export default class VirtualList extends Component {

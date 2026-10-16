@@ -24,6 +24,15 @@ exports.onClose = async function (e) {
     globalState.set('closeAction', '')
     return e.preventDefault()
   }
+  // 最后一次状态落盘前保留窗口和会话，防止关闭后丢失刚输入的草稿。
+  if (globalState.get('workspacePersistenceReady') && !globalState.get('workspaceCloseReady')) {
+    e.preventDefault()
+    if (!globalState.get('workspaceClosePending')) {
+      globalState.set('workspaceClosePending', true)
+      globalState.get('win')?.webContents.send('prepare-workspace-close')
+    }
+    return
+  }
   log.debug('Closing app')
   const childPid = globalState.get('childPid')
   childPid && process.kill(childPid)

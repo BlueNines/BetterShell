@@ -9,6 +9,7 @@ const execAsync = promisify(exec)
 const { getSizeCount, getSizeCountWin } = require('../common/get-folder-size-and-file-count.js')
 
 const ROOT_PATH = '/'
+const { readDirectory } = require('../common/read-directory')
 
 function encodeUtf8Base64 (value) {
   return Buffer.from(String(value), 'utf8').toString('base64')
@@ -323,6 +324,7 @@ const fsExport = Object.assign(
     statCustom
   },
   {
+    readDirectoryAsync: readDirectory,
     readdirAsync: (_path) => {
       if (_path === ROOT_PATH && isWin) {
         return listWindowsRootPath()

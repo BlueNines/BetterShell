@@ -1,6 +1,7 @@
 import { throttle } from 'lodash-es'
 import { resizeTerm } from '../terminal-apis.js'
 import { minTerminalFontSize } from '../../../common/constants.js'
+import { fitTerminalWithHistory } from '../terminal-history.js'
 
 /**
  * Sizing: fitting the terminal into its (possibly hidden) container, font
@@ -22,16 +23,21 @@ export const resizeMixin = {
   // 若在此时 fit 会算出 0/极小列数，使 shell 提示符被逐字符错误换行，
   // 出现快速连续打开多个连接时的虚假/重复提示符。因此隐藏态跳过 fit，
   // 保留 xterm 默认 80x24，待标签激活可见后再 fit 重绘，从根上避免换行损坏。
-  fitAndRefresh () {
+  fitAndRefresh (force = false) {
     if (!this.term || !this.fitAddon || this.onClose) {
+      return
+    }
+    if (this.popout?.ready) {
+      this.popout.resize(force)
       return
     }
     if (!this.isElementVisible()) {
       return
     }
     try {
-      this.fitAddon.fit()
+      fitTerminalWithHistory(this.term, () => this.fitAddon.fit())
       this.term.refresh(0, this.term.rows - 1)
+      this.onResizeTerminal({ cols: this.term.cols, rows: this.term.rows }, force)
     } catch (e) {
       console.info('resize failed', e)
     }
@@ -46,9 +52,17 @@ export const resizeMixin = {
     this._resizeThrottled()
   },
 
-  onResizeTerminal (size) {
+  // 同一尺寸只发一次；显示位置切换时强制确认服务端收到当前行列数。
+  onResizeTerminal (size, force = false) {
     const { cols, rows } = size
-    resizeTerm(this.pid, cols, rows)
+    if (!this.pid || this.onClose || !Number.isInteger(cols) || !Number.isInteger(rows) || cols < 2 || rows < 1) return
+    const key = `${this.pid}:${cols}:${rows}`
+    if (!force && this.lastPtySize === key) return
+    this.lastPtySize = key
+    return resizeTerm(this.pid, cols, rows).catch(error => {
+      if (this.lastPtySize === key) this.lastPtySize = ''
+      if (!this.onClose) console.info('terminal resize failed', error.message)
+    })
   },
 
   zoom (v) {

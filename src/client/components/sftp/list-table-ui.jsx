@@ -15,6 +15,8 @@ import IconHolder from '../sys-menu/icon-holder'
 import { filesRef } from '../common/ref'
 import findParent from '../../common/find-parent'
 import { removeClass } from '../../common/class'
+import { FILE_ROW_HEIGHT, findFilePrefix } from '../../common/file-list-navigation'
+import resolve from '../../common/resolve'
 
 const e = window.translate
 const fileItemCls = 'sftp-item'
@@ -32,6 +34,7 @@ export default class FileListTable extends Component {
   }
 
   containerRef = createRef()
+  prefixSearch = null
 
   onDragOver = e => {
     e.preventDefault()
@@ -100,6 +103,7 @@ export default class FileListTable extends Component {
     const contentChanged = prevList.length !== nextList.length ||
       prevList.some((f, i) => f.id !== nextList[i].id)
     if (contentChanged) {
+      this.prefixSearch = null
       if (this.containerRef.current) {
         this.containerRef.current.scrollTop = 0
       }
@@ -238,7 +242,7 @@ export default class FileListTable extends Component {
     const { sortDirection, sortProp } = this.props
     const sortDirectionNew = sortProp === name
       ? this.otherDirection(sortDirection)
-      : this.props.defaultDirection()
+      : name === 'name' ? 'asc' : this.props.defaultDirection()
     const { type } = this.props
     window.store.setSftpSortSetting({
       [type]: {
@@ -307,6 +311,8 @@ export default class FileListTable extends Component {
   }
 
   handleClick = (e) => {
+    this.focusList(e)
+    this.prefixSearch = null
     const target = e.target.closest('[data-id]')
     if (target) {
       const id = target.getAttribute('data-id')
@@ -315,6 +321,62 @@ export default class FileListTable extends Component {
       if (ref) {
         ref.onClick(e)
       }
+    }
+  }
+
+  // 鼠标进入新目录行时安排少量预读，同一行内部移动不重复安排。
+  handleMouseOver = event => {
+    const row = event.target.closest('.sftp-item')
+    if (!row || row.contains(event.relatedTarget)) return
+    const file = filesRef.get('file-' + row.dataset.id)?.state.file
+    if (file?.isDirectory && !file.isParent && !file.isEmpty) this.props.prefetchDirectory(this.props.type, resolve(file.path, file.name))
+  }
+
+  // 点击文件或空白处后让列表接收键盘，输入框与菜单继续保持各自焦点。
+  focusList = (event) => {
+    if (!event.target.closest('input, textarea, button, select, [contenteditable="true"]')) this.containerRef.current?.focus({ preventScroll: true })
+  }
+
+  // 只挂载目标附近的行，定位数千项列表时不扫描或创建全部 DOM。
+  selectFileAt = (index) => {
+    const file = this.props.fileList[index]
+    const container = this.containerRef.current
+    if (!file || !container) return
+    this.props.modifier({ selectedFiles: new Set([file.id]), selectedType: this.props.type, lastClickedFile: file })
+    this.currentFileId = 'file-' + file.id
+    const top = (index + Number(Boolean(this.props.parentItem))) * FILE_ROW_HEIGHT
+    if (top < container.scrollTop) container.scrollTop = top
+    else if (top + FILE_ROW_HEIGHT > container.scrollTop + container.clientHeight) container.scrollTop = top + FILE_ROW_HEIGHT - container.clientHeight
+    this.setState({ scrollTop: container.scrollTop })
+  }
+
+  // 输入前缀、方向键与 Enter 均限定在当前列表，终端和重命名输入不受影响。
+  handleKeyDown = (event) => {
+    if (event.isComposing || event.keyCode === 229 || event.ctrlKey || event.metaKey || event.altKey || event.target.closest('input, textarea, select, [contenteditable="true"]')) return
+    const files = this.props.fileList
+    const selectedId = this.props.lastClickedFile?.type === this.props.type ? this.props.lastClickedFile.id : null
+    const selected = files.findIndex(file => file.id === selectedId && this.props.selectedFiles.has(file.id))
+    if (event.key === 'Enter') {
+      if (selected < 0) return
+      event.preventDefault()
+      event.stopPropagation()
+      this.prefixSearch = null
+      filesRef.get('file-' + files[selected].id)?.transferOrEnterDirectory(event)
+      return
+    }
+    const steps = { ArrowDown: selected + 1, ArrowUp: selected < 0 ? files.length - 1 : selected - 1, Home: 0, End: files.length - 1 }
+    if (Object.hasOwn(steps, event.key)) {
+      event.preventDefault()
+      event.stopPropagation()
+      this.prefixSearch = null
+      this.selectFileAt(Math.max(0, Math.min(files.length - 1, steps[event.key])))
+    } else if (event.key === 'Escape') {
+      this.prefixSearch = null
+    } else if (Array.from(event.key).length === 1 && event.key !== ' ') {
+      event.preventDefault()
+      event.stopPropagation()
+      this.prefixSearch = findFilePrefix(files, this.prefixSearch, event.key, selectedId)
+      if (this.prefixSearch.index >= 0) this.selectFileAt(this.prefixSearch.index)
     }
   }
 
@@ -363,7 +425,7 @@ export default class FileListTable extends Component {
 
   render () {
     const { fileList, height, type } = this.props
-    const containerHeight = height - 42 - 30 - 32 - 90
+    const containerHeight = Math.max(40, height - 76)
     const props = {
       ref: this.containerRef,
       className: 'sftp-table-content overscroll-y relative',
@@ -371,8 +433,14 @@ export default class FileListTable extends Component {
         height: containerHeight
       },
       draggable: false,
+      tabIndex: 0,
+      role: 'listbox',
+      'aria-label': type === 'remote' ? '远程文件列表' : '本地文件列表',
+      onKeyDown: this.handleKeyDown,
+      onBlur: () => { this.prefixSearch = null },
       onScroll: this.onScroll,
       onClick: this.handleClick,
+      onMouseOver: this.handleMouseOver,
       onDoubleClick: this.handleDoubleClick,
       onDragOver: this.onDragOver,
       onDragEnter: this.onDragEnter,

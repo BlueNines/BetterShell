@@ -530,7 +530,7 @@ class Tab extends Component {
       >
         <div
           className={cls}
-          draggable
+          draggable={this.props.draggable !== false}
           ref={this.tabRef}
           data-id={id}
           {...pick(this, [

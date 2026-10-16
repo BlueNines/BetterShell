@@ -8,6 +8,7 @@ const fs = require('fs')
 const path = require('path')
 const { app } = require('electron')
 const globalState = require('./glob-state')
+const { showMainWindow } = require('./window-restore')
 
 // Get socket path based on platform
 function getSocketPath () {
@@ -20,10 +21,9 @@ function getSocketPath () {
   return path.join(tmpDir, `${appName}-instance.sock`)
 }
 
-const socketPath = getSocketPath()
-
 // Clean up stale socket file on Unix
 function cleanupSocket () {
+  const socketPath = getSocketPath()
   if (process.platform !== 'win32' && fs.existsSync(socketPath)) {
     try {
       fs.unlinkSync(socketPath)
@@ -38,6 +38,7 @@ function cleanupSocket () {
  * @param {Function} onSecondInstance - Callback when second instance sends data
  */
 function startSocketServer (onSecondInstance) {
+  const socketPath = getSocketPath()
   cleanupSocket()
 
   const server = net.createServer((socket) => {
@@ -77,7 +78,7 @@ function startSocketServer (onSecondInstance) {
  */
 function sendToFirstInstance (data) {
   return new Promise((resolve) => {
-    const client = net.createConnection(socketPath, () => {
+    const client = net.createConnection(getSocketPath(), () => {
       client.write(JSON.stringify(data))
       client.end()
     })
@@ -109,11 +110,7 @@ async function handleSingleInstance (progs) {
   // We are the primary instance, start socket server
   startSocketServer((data) => {
     const win = globalState.get('win')
-    if (win) {
-      if (win.isMinimized()) {
-        win.restore()
-      }
-      win.focus()
+    if (showMainWindow(win)) {
       win.webContents.send('add-tab-from-command-line', data)
     }
   })

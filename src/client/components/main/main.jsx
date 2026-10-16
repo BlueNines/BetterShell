@@ -78,6 +78,7 @@ export default auto(function Index (props) {
     ipcOnEvent('zoomin', store.onZoomIn)
     ipcOnEvent('zoomout', store.onZoomout)
     ipcOnEvent('confirm-exit', store.beforeExitApp)
+    ipcOnEvent('prepare-workspace-close', store.prepareWorkspaceClose)
 
     document.addEventListener('drop', function (e) {
       e.preventDefault()

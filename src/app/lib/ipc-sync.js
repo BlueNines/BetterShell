@@ -129,6 +129,7 @@ module.exports = {
         'unlink',
         'rmrf',
         'readdirAsync',
+        'readDirectoryAsync',
         'readFile',
         'readFileAsBase64',
         'writeFile',

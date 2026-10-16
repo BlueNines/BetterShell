@@ -20,6 +20,7 @@ import { action } from 'manate'
 import { shouldCaptureTerminalReloadState } from '../components/terminal/ssh-reload-state.js'
 import dangerousSessionFields from '../common/dangerous-session-fields'
 import { distributeTabsEvenly } from '../common/distribute-tabs'
+import { captureWorkspaceState, seedWorkspaceState } from '../common/workspace-state'
 
 function captureSshSessionState (tab, config) {
   return shouldCaptureTerminalReloadState(tab, config)
@@ -117,6 +118,9 @@ export default Store => {
       id: generate(), // Need to create new ID
       status: statusMap.processing // Reset status
     }
+    seedWorkspaceState(newTab.id, captureWorkspaceState(oldTab.id))
+    // Shell 重连后拉条仍能识别原来的同级 screen 标签，避免重复打开。
+    for (const tab of tabs) if (tab.screenSourceId === oldTab.id) tab.screenSourceId = newTab.id
     delete newTab._reloadState
     if (reloadState) {
       newTab._reloadState = reloadState
@@ -353,6 +357,10 @@ export default Store => {
 
   Store.prototype.clickTab = function (id, batch) {
     const { store } = window
+    // 快捷键或点击选中已有 screen 时，同步展开所属标签组。
+    const sourceId = store.tabs.find(tab => tab.id === id)?.screenSourceId
+    const source = sourceId && store.tabs.find(tab => tab.id === sourceId)
+    if (source) source.screenTabsExpanded = true
 
     // Update current batch
     store.currentLayoutBatch = batch
@@ -383,6 +391,8 @@ export default Store => {
     }
     const { store } = window
     const { tabs } = store
+    if (newTab.type && !['ssh', 'local'].includes(newTab.type)) return message.warning('个人版仅支持 SSH 和本机终端')
+    newTab.sshSftpSplitView = !newTab.screenSession
     newTab.tabCount = store.nextTabCount()
     // Sanitize batch: MCP/AI callers may pass a missing, string, or
     // out-of-range batch which would crash Sessions (sizes[batch]
@@ -587,12 +597,19 @@ export default Store => {
     if (!tab) {
       return
     }
+    // 独立窗口合回或程序主动选中 screen 时，让所属 Shell 的标签组可见。
+    if (tab.screenSourceId) {
+      const source = tabs.find(source => source.id === tab.screenSourceId)
+      if (source) source.screenTabsExpanded = true
+    }
     store.activeTabId = id
     store[`activeTabId${tab.batch}`] = id
     store.focus()
   }
 
   Store.prototype.updateHistory = function (tab) {
+    // screen 的顶层位置由工作区保存，服务器连接历史不重复记录 screen。
+    if (tab.screenSession) return
     if (
       !tab.type &&
       !tab.host

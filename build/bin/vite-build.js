@@ -4,4 +4,5 @@ const { resolve } = require('path')
 const p = resolve(__dirname, '../vite')
 cd(p)
 
-exec('npm run build')
+// 把前端编译错误传回总构建脚本，不能继续复制旧产物。
+process.exitCode = exec('npm run build').code

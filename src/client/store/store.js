@@ -6,14 +6,13 @@ import initState from './init-state'
 import loadDataExtend from './load-data'
 import dbUpgradeExtend from './db-upgrade'
 import eventExtend from './event'
-import syncExtend from './sync'
+import syncExtend from './local-persistence'
 import appUpgradeExtend from './app-upgrade'
 import bookmarkGroupExtend from './bookmark-group'
 import bookmarkExtend from './bookmark'
 import commonExtend from './common'
 import itemExtend from './item'
 import quickCommandExtend from './quick-command'
-import triggerExtend from './trigger'
 import sessionExtend from './session'
 import settingExtend from './setting'
 import sidebarExtend from './sidebar'
@@ -25,14 +24,12 @@ import transferHistoryExtend from './transfer-history'
 import batchInputHistory from './batch-input-history'
 import transferExtend from './transfer-list'
 import addressBookmarkExtend from './address-bookmark'
-import widgetsExtend from './widgets'
-import mcpHandlerExtend from './mcp-handler'
 import workspaceExtend from './workspace'
+import personalWorkspaceExtend from './personal-workspace'
 import isColorDark from '../common/is-color-dark'
 import { getReverseColor } from '../common/reverse-color'
 import { uniq } from 'lodash-es'
 import deepCopy from 'json-deep-copy'
-import getBrand from '../components/ai/get-brand'
 import {
   settingMap,
   terminalSshConfigType,
@@ -137,14 +134,9 @@ class Store {
 
   get rightPanelTitle () {
     const {
-      rightPanelTab,
-      config: {
-        baseURLAI
-      }
+      rightPanelTab
     } = window.store
-    if (rightPanelTab === 'ai') {
-      return getBrand(baseURLAI).brand || 'Custom AI Model'
-    }
+
     if (rightPanelTab === 'cmdHistory') {
       return window.translate('cmdHistory')
     }
@@ -263,7 +255,7 @@ class Store {
     const {
       store
     } = window
-    return store.showModal ||
+    return store.personalDialog || store.showModal ||
       store.showInfoModal ||
       store.showEditor ||
       store.showFileModal
@@ -326,7 +318,6 @@ bookmarkExtend(Store)
 commonExtend(Store)
 itemExtend(Store)
 quickCommandExtend(Store)
-triggerExtend(Store)
 sessionExtend(Store)
 settingExtend(Store)
 sidebarExtend(Store)
@@ -338,8 +329,7 @@ transferHistoryExtend(Store)
 batchInputHistory(Store)
 transferExtend(Store)
 addressBookmarkExtend(Store)
-widgetsExtend(Store)
-mcpHandlerExtend(Store)
 workspaceExtend(Store)
+personalWorkspaceExtend(Store)
 
 export const StateStore = Store

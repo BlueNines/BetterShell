@@ -1,0 +1,99 @@
+.personal-console-group
+  display flex
+  flex-direction column
+  min-width 0
+  .personal-console-views
+    position relative
+    flex 1
+    min-height 0
+  .personal-console-view
+    position absolute
+    inset 0
+  .personal-console-detached
+    height 100%
+    display flex
+    flex-direction column
+    align-items center
+    justify-content center
+    gap 10px
+    color #8498b6
+
+.screen-picker
+  width 320px
+  max-width calc(100vw - 48px)
+  max-height unquote('min(400px, calc(100vh - 110px))')
+  overflow-y auto
+  .screen-picker-heading
+    display flex
+    justify-content space-between
+    align-items center
+    margin-bottom 8px
+  .screen-picker-error
+    color #dc7272
+  .screen-picker-item
+    width 100%
+    display flex
+    align-items center
+    justify-content space-between
+    gap 12px
+    background none
+    color inherit
+    border 0
+    text-align left
+    cursor pointer
+    padding 8px
+    border-radius 4px
+    &:hover
+      background rgba(125,170,255,.12)
+    > span
+      min-width 0
+      overflow-wrap anywhere
+    small
+      display block
+      color #8498b6
+      font-size 11px
+    em
+      flex-shrink 0
+      font-style normal
+      color #8498b6
+      font-size 11px
+.personal-top-tab
+  display flex
+  flex none
+  align-items stretch
+  .shell-screen-pull, .shell-screen-add
+    height 34px
+    width 22px
+    padding 0
+    border-right 1px solid rgba(128,145,168,.2)
+    border-radius 0
+    font-size 10px
+.personal-screen-session
+  height 100%
+  width 100%
+
+.personal-draggable-tabs .tab
+  touch-action none
+  user-select none
+  .tab-title
+    cursor grab
+  &.ondrag-tab
+    opacity .5
+
+.personal-tab-drag-preview
+  position fixed
+  left 0
+  top 0
+  z-index 99999
+  pointer-events none
+  max-width 360px
+  padding 8px 12px
+  border 1px solid #5d83b7
+  border-radius 6px
+  background #202a39
+  color #d6e4f5
+  font-size 12px
+  overflow hidden
+  text-overflow ellipsis
+  white-space nowrap
+  box-shadow 0 4px 14px rgba(0,0,0,.25)

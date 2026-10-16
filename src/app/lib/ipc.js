@@ -9,7 +9,8 @@ const {
   dialog,
   powerMonitor,
   globalShortcut,
-  shell
+  shell,
+  nativeTheme
 } = require('electron')
 const globalState = require('./glob-state')
 const ipcSyncFuncs = require('./ipc-sync')
@@ -18,13 +19,6 @@ const { listItermThemes } = require('./iterm-theme')
 const installSrc = require('./install-src')
 const { getConfig } = require('./get-config')
 const loadSshConfig = require('./ssh-config')
-const {
-  listWidgets,
-  runWidget,
-  stopWidget,
-  runWidgetFunc
-} = require('../widgets/load-widget')
-const widgetLog = require('../widgets/instance-log')
 const {
   checkMigrate,
   migrate
@@ -64,7 +58,6 @@ const {
 const { openFileWithEditor } = require('./open-file-with-editor')
 const { loadFontList } = require('./font-list')
 const { checkDbUpgrade, doUpgrade } = require('../upgrade')
-const { listSerialPorts } = require('./serial-port')
 const initApp = require('./init-app')
 const { encryptAsync, decryptAsync } = require('./enc')
 const { safeEncrypt, safeDecrypt } = require('./safe-storage')
@@ -76,14 +69,10 @@ const {
 } = require('./install-command')
 const { watchFile, unwatchFile } = require('./watch-file')
 const lookup = require('../common/lookup')
-const {
-  AIchat,
-  AIchatWithTools,
-  AIlistModels,
-  getStreamContent,
-  stopStream,
-  abortAIRequest
-} = require('./ai')
+const databaseProfiles = require('./database-profiles')
+const personalWorkspace = require('./personal-workspace')
+const { openNotepadFiles } = require('./notepad-editor')
+const { focusTerminalOwner } = require('./terminal-popouts')
 
 // Security: whitelist of safe environment variables for Linux/Mac/Windows
 const SAFE_ENV_KEYS = [
@@ -141,6 +130,7 @@ async function initAppServer () {
     const child = await initServer(config, {
       ...process.env,
       appPath,
+      BETTERSHELL_EDITOR_CACHE: require('path').join(process.env.DATA_PATH || app.getPath('userData'), 'editor-cache'),
       sshKeysPath
     }, sysLocale)
     child.on('message', (m) => {
@@ -175,7 +165,7 @@ function initIpc () {
       isPortable,
       // where running widgets write their logs; the widget manager reads them
       // straight off disk (see widgets/instance-log.js)
-      widgetLogPath: widgetLog.getLogDir()
+      widgetLogPath: ''
     }
     initApp(langMap, config)
     initShortCut(globalShortcut, globalState.get('win'), config)
@@ -198,7 +188,6 @@ function initIpc () {
     lookup,
     loadSshConfig,
     init,
-    listSerialPorts,
     loadFontList,
     doUpgrade,
     checkDbUpgrade,
@@ -213,6 +202,8 @@ function initIpc () {
     safeEncrypt: (str) => safeEncrypt(str),
     safeDecrypt: (str) => safeDecrypt(str),
     dbAction,
+    ...databaseProfiles,
+    ...personalWorkspace,
     getScreenSize,
     closeApp: (closeAction = '') => {
       globalState.set('closeAction', closeAction)
@@ -244,12 +235,10 @@ function initIpc () {
       lastStateManager.set('windowSize', update)
     },
     saveUserConfig,
-    AIchat,
-    AIchatWithTools,
-    AIlistModels,
-    getStreamContent,
-    stopStream,
-    abortAIRequest,
+    // 同步系统标题栏和原生菜单颜色，只接受深色或浅色模式。
+    setNativeUiTheme: (mode) => {
+      nativeTheme.themeSource = mode === 'light' ? 'light' : 'dark'
+    },
     setTitle: (title) => {
       const win = globalState.get('win')
       win && win.setTitle(packInfo.name + ' - ' + title)
@@ -271,10 +260,8 @@ function initIpc () {
     watchFile,
     unwatchFile,
     openFileWithEditor,
-    listWidgets,
-    runWidget,
-    stopWidget,
-    runWidgetFunc,
+    openNotepadFiles,
+    focusTerminalOwner,
     registerDeepLink,
     unregisterDeepLink,
     checkProtocolRegistration,

@@ -216,6 +216,9 @@ class Term extends Component {
   }
 
   componentWillUnmount () {
+    this.popout?.dispose(false)
+    this.terminalHistory?.dispose()
+    this._resizeThrottled?.cancel()
     refs.remove(this.id)
     clearTimeout(this.longPressTimer)
     this.longPressTimer = null
@@ -257,6 +260,9 @@ class Term extends Component {
       this.attachAddon = null
     }
     if (this.term) {
+      // 连字插件注销时会请求重绘，必须在 xterm 渲染器销毁前释放。
+      this.ligaturesAddon?.dispose()
+      this.ligaturesAddon = null
       this.term.dispose()
       this.term = null
     }

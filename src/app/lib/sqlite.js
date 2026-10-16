@@ -10,7 +10,7 @@ const uid = require('../common/uid')
 const { DatabaseSync } = require('node:sqlite')
 
 // Tables whose stored data values should be encrypted at rest
-const ENC_TABLES = new Set(['bookmarks', 'profiles', 'data', 'history', 'terminalCommandHistory', 'aiChatHistory'])
+const ENC_TABLES = new Set(['bookmarks', 'profiles', 'databaseConnections', 'personalWorkspace', 'data', 'history', 'terminalCommandHistory', 'aiChatHistory'])
 
 // Within the 'data' table, only this specific record is encrypted
 const DATA_ENC_ID = 'userConfig'
@@ -19,7 +19,7 @@ const DATA_ENC_ID = 'userConfig'
 const ENC_PREFIX = 'enc:'
 
 function createDb (appPath, defaultUserName, { enc, dec } = {}) {
-  const appDataPath = process.env.DATA_PATH || resolve(appPath, 'electerm')
+  const appDataPath = process.env.DATA_PATH || resolve(appPath, 'bettershell')
 
   if (!fs.existsSync(appDataPath)) {
     fs.mkdirSync(appDataPath, { recursive: true })
@@ -49,6 +49,8 @@ function createDb (appPath, defaultUserName, { enc, dec } = {}) {
     'log',
     'dbUpgradeLog',
     'profiles',
+    'databaseConnections',
+    'personalWorkspace',
     'workspaces',
     'triggers',
     'history',
@@ -118,10 +120,9 @@ function createDb (appPath, defaultUserName, { enc, dec } = {}) {
     delete copy._id
     delete copy.id
     const jsonStr = JSON.stringify(copy)
-    return {
-      _id,
-      data: enc && shouldEncForRow(dbName, _id) ? encryptData(jsonStr) : jsonStr
-    }
+    const data = enc && shouldEncForRow(dbName, _id) ? encryptData(jsonStr) : jsonStr
+    if (['databaseConnections', 'personalWorkspace'].includes(dbName) && !data.startsWith('enc:v2:safe:')) throw new Error('系统加密不可用，连接或工作区未保存')
+    return { _id, data }
   }
 
   async function dbAction (dbName, op, ...args) {

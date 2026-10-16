@@ -4,9 +4,7 @@
 
 import Modal from '../components/common/modal'
 import { isString } from 'lodash-es'
-import getInitItem from '../common/init-setting-item'
 import {
-  settingMap,
   maxZoom,
   minZoom
 } from '../common/constants'
@@ -53,15 +51,10 @@ export default Store => {
     }
   }
 
+  // 打开个人版 SSH 连接表单。
   Store.prototype.onNewSsh = function () {
-    const { store } = window
-    store.storeAssign({
-      settingTab: settingMap.bookmarks
-    })
-    store.setSettingItem(getInitItem([], settingMap.bookmarks))
-    store.openSettingModal()
-    // on mobile, jump straight to the new bookmark form instead of the menu
-    store.settingMobileView = 'content'
+    window.store.personalBookmarkId = ''
+    window.store.personalDialog = 'connection'
   }
 
   Store.prototype.onNewSshAI = function () {

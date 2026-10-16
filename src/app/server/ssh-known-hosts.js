@@ -14,8 +14,9 @@ function normalizeHost (host = '') {
   return host
 }
 
+// 与当前 SSH 密钥目录保持一致，支持隔离测试而不改动用户文件。
 function getKnownHostsPath () {
-  return join(os.homedir(), '.ssh', 'known_hosts')
+  return join(process.env.sshKeysPath || join(os.homedir(), '.ssh'), 'known_hosts')
 }
 
 function getKnownHostCandidates (host, port) {

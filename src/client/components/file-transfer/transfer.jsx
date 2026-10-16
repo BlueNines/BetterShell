@@ -145,6 +145,10 @@ export default class TransportAction extends Component {
     const {
       typeTo
     } = transfer
+    // 传输完成时按实际目标失效缓存，切换目录期间的上传也能正确更新。
+    const panel = refs.get('sftp-' + this.tabId)
+    if (transfer.toPath) panel?.directoryCaches.get(typeTo)?.invalidate(resolve(transfer.toPath, '..'))
+    if (transfer.operation === fileOperationsMap.mv && transfer.fromPath) panel?.directoryCaches.get(transfer.typeFrom)?.invalidate(resolve(transfer.fromPath, '..'))
     const finishTime = Date.now()
     if (!config.disableTransferHistory) {
       const fromFile = transfer.fromFile || this.fromFile

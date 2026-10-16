@@ -112,8 +112,9 @@ function toMs (ms, date) {
 }
 
 export const getLocalFileInfo = async (filePath) => {
-  const statr = await window.fs.statAsync(filePath)
   const stat = await window.fs.lstatAsync(filePath)
+  const symbolic = toIsSymbolicLink(stat)
+  const statr = symbolic ? await window.fs.statAsync(filePath) : stat
   return {
     size: stat.size,
     accessTime: toMs(stat.atimeMs, stat.atime),
@@ -125,8 +126,19 @@ export const getLocalFileInfo = async (filePath) => {
     ...getFolderFromFilePath(filePath, false),
     id: generate(),
     isDirectory: toIsDirectory(statr),
-    isSymbolicLink: toIsSymbolicLink(stat)
+    isSymbolicLink: symbolic
   }
+}
+
+// 普通目录只请求一次完整属性列表，Windows 虚拟根目录继续沿用磁盘枚举。
+export async function getLocalDirectoryInfo (folder) {
+  if (folder !== '/' && window.fs.readDirectoryAsync) {
+    const entries = await window.fs.readDirectoryAsync(/^[a-z]:$/i.test(folder) ? folder + '\\' : folder)
+    return entries.map(file => ({ ...file, ...getFileExt(file.name), path: folder, type: 'local', id: generate() }))
+  }
+  const names = await window.fs.readdirAsync(folder)
+  const entries = await Promise.all(names.map(name => getLocalFileInfo(folder === '/' && /^[a-z]:$/i.test(name) ? name + '\\' : window.pre.resolve(folder, name)).catch(() => null)))
+  return entries.filter(Boolean)
 }
 
 export const getRemoteFileInfo = async (sftp, filePath) => {
