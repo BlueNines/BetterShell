@@ -43,7 +43,7 @@ jobs:
           echo "Triggering electerm-npm publish for $ver"
 
       - name: Trigger electerm/electerm-npm publish
-        uses: peter-evans/repository-dispatch@v2
+        uses: peter-evans/repository-dispatch@v4
         with:
           token: ${{ secrets.PAT_REPO_TOKEN }}
           repository: electerm/electerm-npm
