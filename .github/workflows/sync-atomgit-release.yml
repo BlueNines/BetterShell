@@ -77,7 +77,7 @@ jobs:
       # verified 2026-10-02 against the real repo. Full history is only ~20MB /
       # ~10s here, so there is nothing to optimise.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
